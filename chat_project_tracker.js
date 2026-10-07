@@ -1,5 +1,5 @@
 /**
- * chat_project_tracker.js - AndrOBS Universal Live Showcase & Community Queue
+ * chat_project_tracker.js - androbs Universal Live Showcase & Community Queue
  * Detects, categorizes, and organizes games, tech projects, websites, handmade art and stream topics shared in live chat.
  */
 

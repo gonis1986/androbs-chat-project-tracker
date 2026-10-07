@@ -1,4 +1,4 @@
-# ✨ AndrOBS Universal Live Showcase & Community Queue
+# ✨ androbs Universal Live Showcase & Community Queue
 
 > A real-time widget for **every** kind of streamer: gaming, coding, web design, art & crafts, or just chatting.
 > It listens to live chat (Twitch, YouTube, Kick), picks out what viewers want to show or suggest, sorts it into categories, lets chat vote on it, and puts it on stream.

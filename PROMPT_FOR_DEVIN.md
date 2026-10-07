@@ -1,6 +1,6 @@
 # 🤖 Instructions for Devin AI
 
-Hey Devin! This repository contains `AndrOBS - Live Chat Project Tracker`, a lightweight widget used by live streamers to detect, extract, and list projects & ideas proposed by viewers in live chat (Twitch, Kick, YouTube).
+Hey Devin! This repository contains `androbs - Live Chat Project Tracker`, a lightweight widget used by live streamers to detect, extract, and list projects & ideas proposed by viewers in live chat (Twitch, Kick, YouTube).
 
 Please open and inspect:
 - `index.html` (the test sandbox)

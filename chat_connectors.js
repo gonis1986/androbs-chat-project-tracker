@@ -1,5 +1,5 @@
 /**
- * chat_connectors.js - AndrOBS multi-platform chat adapters & live connectors (Twitch, Kick, YouTube).
+ * chat_connectors.js - androbs multi-platform chat adapters & live connectors (Twitch, Kick, YouTube).
  *
  * Adapters turn raw platform payloads into the tracker's normalized message shape:
  *   { id, author, text, color, timestamp, platform }
