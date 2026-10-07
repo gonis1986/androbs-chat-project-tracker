@@ -102,6 +102,7 @@
       check('showOnStream returns true', t.showOnStream(xss.id), true);
       const ov = document.querySelector('.cpt-overlay');
       check('overlay rendered and sliding in', !!ov && ov.classList.contains('cpt-overlay-in'), true);
+      check('overlay uses the item category theme', [ov.classList.contains('cpt-cat-tech'), ov.querySelector('.cpt-overlay-live').textContent.trim()], [true, 'Tech & Code']);
       check('overlay escapes chat content', [ov.querySelector('.cpt-overlay-title').textContent, ov.querySelectorAll('img, script').length], ['<img src=x onerror=alert(1)>', 0]);
       check('overlay link is clickable', ov.querySelector('.cpt-overlay-link').getAttribute('href'), 'https://github.com/eve/xss');
       check('overlay shows author', ov.querySelector('.cpt-overlay-author').textContent.trim(), 'by @Eve<script>');
@@ -116,18 +117,58 @@
       await sleep(800);
       check('overlay element removed after fade-out', document.querySelectorAll('.cpt-overlay').length, 0);
 
+      // ---------- Categories, Stream Mode & themed overlay ----------
+      const c = new ChatProjectTracker({ containerId: '__none__', persist: false, overlayDuration: 300 });
+      c.processMessage({ id: 'g', author: 'G', text: 'You should play Hades II next! https://store.steampowered.com/app/1145350/Hades_II/' });
+      check('steam suggestion -> gaming', pick(c.projects[0], ['category', 'title', 'tags']), { category: 'gaming', title: 'Hades II', tags: ['Steam'] });
+      c.setStreamMode('gaming');
+      check('stream mode skips off-theme items', [c.processMessage({ id: 'e', author: 'E', text: '!art Clay Frog - handmade' }), c.projects.length, c.skippedCount], [false, 1, 1]);
+      check('stream mode keeps on-theme items', c.processMessage({ id: 'g2', author: 'H', text: '!game Balatro - poker roguelike' }), true);
+      check('votes still count in stream mode', c.processMessage({ author: 'V', text: '!vote 1' }), true);
+      c.setStreamMode('all');
+      check('switching mode resets the skipped counter', c.skippedCount, 0);
+      c.processMessage({ id: 'e2', author: 'E', text: '!art Clay Frog - handmade' });
+      c.setCategoryFilter('art');
+      check('category filter', c.getFilteredProjects().map(p => p.title), ['Clay Frog']);
+      c.setCategoryFilter('art');
+      check('clicking the active category again shows all', c.getFilteredProjects().length, 3);
+      c.setSearch('gaming');
+      check('search matches category names', c.getFilteredProjects().map(p => p.title), ['Balatro', 'Hades II']);
+      c.setSearch('');
+      c.showOnStream(c.projects.find(p => p.title === 'Clay Frog').id);
+      let ovc = document.querySelector('.cpt-overlay.cpt-overlay-in');
+      check('overlay uses the handmade & art theme', [ovc.classList.contains('cpt-cat-art'), ovc.querySelector('.cpt-overlay-live').textContent.trim(), ovc.querySelector('.cpt-overlay-icon').textContent.trim(), ovc.querySelector('.cpt-overlay-cat').textContent.trim()],
+        [true, 'Handmade & Art', '🎨', '🎨 Handmade & Art']);
+      c.showOnStream(c.projects.find(p => p.title === 'Hades II').id);
+      ovc = document.querySelector('.cpt-overlay.cpt-overlay-in');
+      check('overlay switches to the gaming theme', [ovc.classList.contains('cpt-cat-gaming'), ovc.classList.contains('cpt-cat-art'), ovc.querySelector('.cpt-overlay-live').textContent.trim(), ovc.querySelector('.cpt-overlay-icon').textContent.trim()],
+        [true, false, 'Game Suggestion', '🎮']);
+      check('themed accent colors differ per category', getComputedStyle(ovc).getPropertyValue('--cat-a').trim(), '#39ff14');
+      c.hideOverlay();
+      await sleep(800);
+
       // ---------- Persistence of votes ----------
       const key = '__cpt_test_' + Date.now();
       const p1 = new ChatProjectTracker({ containerId: '__none__', storageKey: key });
       p1.processMessage({ id: 'p', author: 'P', text: '!project Persisted' });
       p1.processMessage({ author: 'Q', text: '!vote 1' });
       p1.setSort('votes');
+      p1.setStreamMode('tech');
       const p2 = new ChatProjectTracker({ containerId: '__none__', storageKey: key });
-      check('votes, voters, number & sort survive reload', [p2.projects[0].votes, p2.projects[0].voters, p2.projects[0].num, p2.sortMode, p2.seq], [1, ['chat:q'], 1, 'votes', 1]);
+      check('votes, voters, number, sort, category & stream mode survive reload',
+        [p2.projects[0].votes, p2.projects[0].voters, p2.projects[0].num, p2.sortMode, p2.seq, p2.projects[0].category, p2.streamMode],
+        [1, ['chat:q'], 1, 'votes', 1, 'tech', 'tech']);
       localStorage.setItem(key, JSON.stringify([{ id: 'old1', author: 'o', title: 'Old', description: 'x', timestamp: 1 }, { id: 'old2', author: 'o', title: 'Old2', description: 'y', timestamp: 2 }]));
       localStorage.removeItem(key + '_meta');
       const p3 = new ChatProjectTracker({ containerId: '__none__', storageKey: key });
       check('legacy saved projects get numbers oldest-first and 0 votes', p3.projects.map(p => [p.id, p.num, p.votes]), [['old1', 1, 0], ['old2', 2, 0]]);
+      localStorage.setItem(key, JSON.stringify([
+        { id: 'l1', author: 'o', title: 'x', description: 'my game https://store.steampowered.com/app/1/X/', url: 'https://store.steampowered.com/app/1/X/', timestamp: 1 },
+        { id: 'l2', author: 'o', title: 'y', description: 'idea', tags: ['Idea'], timestamp: 2 },
+        { id: 'l3', author: 'o', title: 'z', description: 'repo', url: 'https://github.com/a/b', timestamp: 3 }
+      ]));
+      const p4 = new ChatProjectTracker({ containerId: '__none__', storageKey: key });
+      check('legacy saved projects get a category', p4.projects.map(p => p.category), ['gaming', 'idea', 'tech']);
       localStorage.removeItem(key); localStorage.removeItem(key + '_meta');
 
       document.getElementById('results').innerHTML = lines

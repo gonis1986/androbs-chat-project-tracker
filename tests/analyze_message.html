@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>ChatProjectTracker - analyzeMessage() tests</title>
+  <title>ChatProjectTracker - analyzeMessage() & category tests</title>
   <style>
     body { font-family: monospace; background: #0c0f17; color: #e5e7eb; padding: 20px; }
     .pass { color: #34d399; } .fail { color: #ef4444; font-weight: bold; }
@@ -35,7 +35,7 @@
       ['you should build a bot that clips the best moments', true, ['Idea', 'App']],
       ['idea for the stream: a live coding challenge vs chat', true, ['Idea']],
       ['here is my repo github.com/foo/bar-cli', true, ['GitHub'], 'bar-cli'],
-      ['my game is on itch https://cool-dino.itch.io', true, ['Web'], 'cool-dino'],
+      ['my game is on itch https://cool-dino.itch.io', true, ['itch.io'], 'cool-dino'],
       ['I made a game in Godot over the weekend', true],
       // Spanish
       ['mira este proyecto que hice', true],
@@ -67,7 +67,61 @@
       ['can a mod check this user?', false],
       ['https://www.youtube.com/watch?v=dQw4w9WgXcQ lol', false],
       ['hola a todos desde Argentina', false],
-      ['ciao a tutti!', false]
+      ['ciao a tutti!', false],
+      ['can you play that song again?', false],
+      ['you should play more aggressive', false],
+      ['lol https://clips.twitch.tv/FunnyClip', false],
+      ['made my day https://x.com/foo/status/1', false],
+      ['that drawing on screen is cool', false]
+    ];
+
+    // [text, expectedCategory, expectedTitle (optional)]
+    const categoryCases = [
+      // 🎮 Gaming
+      ['You should play Hollow Knight next!', 'gaming', 'Hollow Knight'],
+      ['You should play Hades II next! https://store.steampowered.com/app/1145350/Hades_II/', 'gaming', 'Hades II'],
+      ['deberías jugar Celeste, es buenísimo', 'gaming', 'Celeste'],
+      ['dovresti giocare a Stardew Valley stasera', 'gaming', 'Stardew Valley'],
+      ['hai mai giocato a Outer Wilds?', 'gaming', 'Outer Wilds'],
+      ['!game Balatro - poker roguelike', 'gaming', 'Balatro'],
+      ['!play Celeste', 'gaming', 'Celeste'],
+      ['my game is on itch https://cool-dino.itch.io', 'gaming', 'cool-dino'],
+      ['I made a game in Godot over the weekend', 'gaming'],
+      ['https://store.steampowered.com/app/413150/Stardew_Valley/', 'gaming', 'Stardew Valley'],
+      // 💻 Tech & Code
+      ['Hey streamer! Check out my open-source project: https://github.com/sofia/voice-transcriber-app', 'tech'],
+      ['¡Hola! He creado una app para calcular estadísticas de la NBA: https://nbastats.vercel.app', 'tech'],
+      ['!project SuperAI - Autonomous agent', 'tech', 'SuperAI'],
+      ['!repo stream-deck-tools', 'tech'],
+      ['mira este proyecto que hice', 'tech'],
+      ['guarda il mio progetto su GitHub', 'tech'],
+      // 🌐 Websites & Portals
+      ['Can you review my portfolio website live? https://anna-designs.com', 'web', 'anna-designs.com'],
+      ['vi condivido il mio sito https://marco.dev', 'web', 'marco.dev'],
+      ['!site https://my-bakery.com', 'web', 'my-bakery.com'],
+      ['!web Mi tienda online - https://tienda-luz.com', 'web', 'Mi tienda online'],
+      ['check this out https://cool-shop.com', 'web', 'cool-shop.com'],
+      ['revisa mi página web https://lucia.es por favor', 'web'],
+      ['what do you think of my portfolio?', 'web'],
+      // 🎨 Handmade & Art
+      ['Hice estos amigurumis a crochet 🧶 https://www.etsy.com/listing/1234567890/handmade-crochet-bunny-amigurumi', 'art', 'Handmade Crochet Bunny Amigurumi'],
+      ['ho dipinto questo ritratto ad acquerello https://www.instagram.com/giulia.acquerelli/', 'art', '@giulia.acquerelli'],
+      ['https://www.etsy.com/shop/LunaTejidos', 'art', 'LunaTejidos'],
+      ['I painted this for the stream!', 'art'],
+      ['check out my new painting', 'art'],
+      ['mira mi dibujo de Goku', 'art'],
+      ['!art Ceramic Dragon Mug - hand-painted', 'art', 'Ceramic Dragon Mug'],
+      ['!craft knitted scarf for winter', 'art'],
+      ['!handmade Leather wallet', 'art'],
+      // 💡 Ideas & Topics
+      ["Topic idea: what's the hardest game you've ever beaten?", 'idea'],
+      ["let's talk about AI art in streaming", 'idea', 'AI art in streaming'],
+      ['pregunta para el stream: ¿cuál fue tu primer setup?', 'idea'],
+      ['hablemos de productividad', 'idea', 'Productividad'],
+      ['parliamo di intelligenza artificiale', 'idea', 'Intelligenza artificiale'],
+      ['challenge: beat the level without jumping', 'idea', 'Beat the level without jumping'],
+      ['!topic best indie games of 2026', 'idea'],
+      ['you should build a bot that clips the best moments', 'idea']
     ];
 
     let pass = 0;
@@ -84,6 +138,19 @@
       return `${errors.length ? 'FAIL' : 'PASS'} ${JSON.stringify(text)}${detail}${errors.length ? '\n     ' + errors.join('; ') : ''}`;
     });
 
+    categoryCases.forEach(([text, category, title]) => {
+      const res = tracker.analyzeMessage({ id: 't', author: 'tester', text });
+      const errors = [];
+      if (!res) errors.push('not detected');
+      else {
+        if (res.category !== category) errors.push(`category=${res.category}, expected ${category}`);
+        if (title && res.title !== title) errors.push(`title="${res.title}", expected "${title}"`);
+      }
+      if (!errors.length) pass++;
+      const detail = res ? ` -> ${res.category} "${res.title}"` : '';
+      lines.push(`${errors.length ? 'FAIL' : 'PASS'} [category] ${JSON.stringify(text)}${detail}${errors.length ? '\n     ' + errors.join('; ') : ''}`);
+    });
+
     // Markdown export
     const md = tracker.toMarkdown([
       { title: 'voice [beta]', url: 'https://github.com/sofia/voice_(app)', author: 'SofiaCode', description: 'Line one\nline two' },
@@ -95,7 +162,7 @@
     if (mdOk) pass++;
     lines.push(`${mdOk ? 'PASS' : 'FAIL'} toMarkdown()${mdOk ? '' : '\n     got: ' + JSON.stringify(md)}`);
 
-    const total = cases.length + 1;
+    const total = cases.length + categoryCases.length + 1;
     document.getElementById('results').innerHTML = lines
       .map(l => `<span class="${l.startsWith('PASS') ? 'pass' : 'fail'}">${l.replace(/</g, '&lt;')}</span>`).join('\n');
     document.getElementById('summary').innerHTML =

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AndrOBS - Live Chat Project Tracker (Demo & Test Sandbox)</title>
+  <title>AndrOBS Universal Live Showcase &amp; Community Queue (Demo &amp; Test Sandbox)</title>
   <link rel="stylesheet" href="chat_project_tracker.css">
   <style>
     body {
@@ -131,6 +131,10 @@
     .sim-btn span.badge-youtube { background: rgba(255, 0, 51, 0.2); color: #fca5a5; }
     .sim-btn span.badge-twitch { background: rgba(145, 70, 255, 0.25); color: #c4b5fd; }
     .sim-btn span.badge-vote { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+    .sim-btn span.badge-gaming { background: rgba(57, 255, 20, 0.14); color: #39ff14; }
+    .sim-btn span.badge-art { background: rgba(244, 114, 182, 0.18); color: #f9a8d4; }
+    .sim-btn span.badge-web { background: rgba(96, 165, 250, 0.18); color: #93c5fd; }
+    .sim-btn span.badge-idea { background: rgba(250, 204, 21, 0.16); color: #fde047; }
 
     .connect-box {
       border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -196,8 +200,8 @@
 <body>
 
   <div class="demo-header">
-    <h1>AndrOBS - Live Chat Project Tracker</h1>
-    <p>Test sandbox for AI project extraction from stream chats (Twitch, Kick, YouTube)</p>
+    <h1>AndrOBS Universal Live Showcase &amp; Community Queue</h1>
+    <p>Games, tech, websites, handmade art and stream topics from Twitch, Kick &amp; YouTube chat: auto-categorized, voted on, and shown on stream</p>
   </div>
 
   <div class="layout-grid">
@@ -230,6 +234,44 @@
         <button class="sim-btn" onclick="sendSimMsg('Gamer99', 'GG streamer! Great play, keep it up!', '#9ca3af')">
           <span>💬 Normal chit-chat (Ignored)</span>
           <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">No trigger</span>
+        </button>
+      </div>
+
+      <p class="sim-section-label">Universal categories (pick a Stream Mode in the widget to test filtering):</p>
+      <div class="sim-buttons">
+        <button class="sim-btn" onclick="simSteamSuggestion()">
+          <span>🎮 <b>Steam</b> game suggestion (Twitch)</span>
+          <span class="badge badge-gaming">Gaming</span>
+        </button>
+
+        <button class="sim-btn" onclick="simEtsyCraft()">
+          <span>🎨 <b>Etsy</b> handmade crochet showcase (Kick, Spanish)</span>
+          <span class="badge badge-art">Handmade &amp; Art</span>
+        </button>
+
+        <button class="sim-btn" onclick="simInstagramArt()">
+          <span>🎨 <b>Instagram</b> watercolor portrait (YouTube, Italian)</span>
+          <span class="badge badge-art">Handmade &amp; Art</span>
+        </button>
+
+        <button class="sim-btn" onclick="simWebsiteReview()">
+          <span>🌐 Website review request (YouTube)</span>
+          <span class="badge badge-web">Websites</span>
+        </button>
+
+        <button class="sim-btn" onclick="simStreamTopic()">
+          <span>💡 General stream topic (Twitch)</span>
+          <span class="badge badge-idea">Ideas &amp; Topics</span>
+        </button>
+
+        <button class="sim-btn" onclick="sendSimMsg('IndieRaul', '!game Balatro - poker roguelike, perfecto para el stream', '#22d3ee')">
+          <span>💬 <b>!game</b> Balatro</span>
+          <span class="badge badge-gaming">Gaming</span>
+        </button>
+
+        <button class="sim-btn" onclick="sendSimMsg('ClayCrafts', '!art Ceramic Dragon Mug - hand-painted and fired this weekend', '#fb923c')">
+          <span>💬 <b>!art</b> Ceramic Dragon Mug</span>
+          <span class="badge badge-art">Handmade &amp; Art</span>
         </button>
       </div>
 
@@ -391,6 +433,37 @@
       const line = `@badge-info=;badges=;color=#FF7F50;display-name=NightOwl_Dev;id=${crypto.randomUUID()};tmi-sent-ts=${Date.now()} ` +
         ':nightowl_dev!nightowl_dev@nightowl_dev.tmi.twitch.tv PRIVMSG #androbs :I built a tool that turns VODs into blog posts https://vod2blog.vercel.app';
       feed(TwitchAdapter.parseLine(line));
+    }
+
+    function twitchLine(name, color, text) {
+      return `@color=${color};display-name=${name};id=${crypto.randomUUID()};tmi-sent-ts=${Date.now()} ` +
+        `:${name.toLowerCase()}!${name.toLowerCase()}@${name.toLowerCase()}.tmi.twitch.tv PRIVMSG #androbs :${text}`;
+    }
+
+    // ---------- Universal category simulators ----------
+    function simSteamSuggestion() {
+      feed(TwitchAdapter.parseLine(twitchLine('GameGuru_MX', '#39FF14',
+        'You should play Hades II next! https://store.steampowered.com/app/1145350/Hades_II/')));
+    }
+
+    function simEtsyCraft() {
+      feed(KickAdapter.parse(kickFrame('LunaTejidos', '#F472B6',
+        '¡Hola! Hice estos amigurumis a crochet [emote:39261:kkHeart] los vendo en https://www.etsy.com/listing/1234567890/handmade-crochet-bunny-amigurumi')));
+    }
+
+    function simInstagramArt() {
+      feed(YouTubeAdapter.parse(youTubeItem('@GiuliaAcquerelli',
+        'Ho dipinto questo ritratto ad acquerello 🎨 https://www.instagram.com/giulia.acquerelli/')));
+    }
+
+    function simWebsiteReview() {
+      feed(YouTubeAdapter.parse(youTubeItem('@AnnaDesigns',
+        'Can you review my portfolio website live? https://anna-designs.com')));
+    }
+
+    function simStreamTopic() {
+      feed(TwitchAdapter.parseLine(twitchLine('CuriousCat', '#FACC15',
+        "Topic idea: what's the hardest game you've ever beaten?")));
     }
 
     function simTwitchVote(text) {

@@ -1,9 +1,36 @@
 /**
- * chat_project_tracker.js - AndrOBS Live Chat Project Tracker
- * Automatically detects, extracts, and organizes projects & ideas shared in live stream chat.
+ * chat_project_tracker.js - AndrOBS Universal Live Showcase & Community Queue
+ * Detects, categorizes, and organizes games, tech projects, websites, handmade art and stream topics shared in live chat.
  */
 
-const CPT_TAG_ORDER = ['GitHub', 'GitLab', 'Vercel', 'Netlify', 'Web', 'App', 'Idea', 'Project'];
+const CPT_TAG_ORDER = ['GitHub', 'GitLab', 'Vercel', 'Netlify', 'Steam', 'itch.io', 'Etsy', 'Instagram', 'Web', 'App', 'Idea', 'Project'];
+
+const CPT_CATEGORIES = {
+  gaming: { label: 'Games', name: 'Gaming', icon: '🎮', overlay: 'Game Suggestion', link: '🕹️' },
+  tech: { label: 'Tech', name: 'Tech & Code', icon: '💻', overlay: 'Tech & Code', link: '🔗' },
+  web: { label: 'Websites', name: 'Websites & Portals', icon: '🌐', overlay: 'Website Review', link: '🌐' },
+  art: { label: 'Handmade & Art', name: 'Handmade & Art', icon: '🎨', overlay: 'Handmade & Art', link: '🛍️' },
+  idea: { label: 'Ideas', name: 'Ideas & Topics', icon: '💡', overlay: 'Stream Topic', link: '🔗' }
+};
+const CPT_CATEGORY_ORDER = Object.keys(CPT_CATEGORIES);
+
+// Explicit chat commands -> category. Lookup is accent-insensitive ("!artesanía" == "!artesania").
+const CPT_COMMANDS = {
+  game: 'gaming', play: 'gaming', juego: 'gaming', jugar: 'gaming', gioco: 'gaming', jogo: 'gaming',
+  project: 'tech', proyecto: 'tech', projeto: 'tech', progetto: 'tech', app: 'tech', repo: 'tech', tech: 'tech', code: 'tech',
+  site: 'web', web: 'web', website: 'web', sitio: 'web', sito: 'web', portfolio: 'web',
+  art: 'art', craft: 'art', handmade: 'art', arte: 'art', diy: 'art', artesania: 'art', manualidad: 'art', artigianato: 'art',
+  idea: 'idea', idee: 'idea', topic: 'idea', tema: 'idea', argomento: 'idea', question: 'idea', pregunta: 'idea',
+  domanda: 'idea', challenge: 'idea', reto: 'idea', sfida: 'idea'
+};
+const CPT_COMMAND_RE = /^!([\p{L}]+)\s+([\s\S]+)/u;
+
+// Link hosts that decide the category on their own.
+const CPT_GAMING_HOST_RE = /(?:^|\.)(?:steampowered\.com|steamcommunity\.com|itch\.io|epicgames\.com|gog\.com|roblox\.com|humblebundle\.com|gamejolt\.com|nintendo\.com|playstation\.com|xbox\.com)$/;
+const CPT_ART_HOST_RE = /(?:^|\.)(?:etsy\.com|instagram\.com|artstation\.com|deviantart\.com|behance\.net|dribbble\.com|pinterest\.[a-z.]+|redbubble\.com|society6\.com|ravelry\.com)$/;
+const CPT_CODE_HOST_RE = /(?:^|\.)(?:github\.com|gitlab\.com|bitbucket\.org|codeberg\.org|huggingface\.co|replit\.com|npmjs\.com|pypi\.org|crates\.io|chromewebstore\.google\.com|chrome\.google\.com|addons\.mozilla\.org|marketplace\.visualstudio\.com|play\.google\.com|apps\.apple\.com)$/;
+// Clips and social posts are not "websites to review".
+const CPT_MEDIA_HOST_RE = /(?:^|\.)(?:youtube\.com|youtu\.be|twitch\.tv|kick\.com|tiktok\.com|twitter\.com|x\.com|reddit\.com|imgur\.com|discord\.gg|discord\.com|giphy\.com|tenor\.com|facebook\.com|spotify\.com)$/;
 const CPT_PLATFORM_LABELS = { twitch: 'Twitch', kick: 'Kick', youtube: 'YouTube' };
 
 // "!vote 3", "!upvote #3", "!voto 3", "!vota 3"; "+1" votes for the project on stream (or the newest one).
@@ -21,7 +48,12 @@ const CPT_NOUNS = [
   'libreria', 'biblioteca', 'paquete', 'programa', 'prototipo', 'portafolio',
   // Italian
   'progetto', 'progettino', 'applicazione', 'strumento', 'sito', 'sito web', 'estensione', 'libreria', 'pacchetto',
-  'programma', 'prototipo'
+  'programma', 'prototipo',
+  // Handmade & art (EN / ES / IT)
+  'painting', 'drawing', 'artwork', 'fanart', 'fan art', 'illustration', 'sculpture', 'crochet', 'amigurumi', 'amigurumis',
+  'jewelry', 'pottery', 'cosplay', 'miniature', 'miniatures', 'craft', 'crafts', 'handmade',
+  'cuadro', 'pintura', 'dibujo', 'ilustracion', 'escultura', 'tejido', 'tejidos', 'artesania', 'manualidad', 'manualidades',
+  'joyeria', 'ceramica', 'quadro', 'dipinto', 'disegno', 'illustrazione', 'scultura', 'ricamo', 'gioielli', 'ritratto', 'retrato'
 ];
 // Weaker nouns only count together with a "creation" verb (avoids "look at this game" on gaming streams).
 const CPT_CREATION_ONLY_NOUNS = ['game', 'videogame', 'script', 'juego', 'videojuego', 'gioco', 'videogioco'];
@@ -32,6 +64,7 @@ const CPT_ATTENTION_INTROS = [
   'sharing', 'i want to share', 'i wanted to share', 'let me share', 'introducing', 'presenting',
   'would love feedback on', 'would love your feedback on', 'feedback on', 'can you review', 'could you review',
   'can you check', 'could you check', 'what do you think of', 'what do you think about', 'thoughts on',
+  'review', 'rate', 'roast', 'can you rate', 'can you roast', 'valora', 'puntua', 'califica', 'recensisci', 'valuta', 'giudica',
   'my new', 'my latest', 'my first', 'my own',
   // Spanish
   'mira', 'miren', 'mirad', 'echa un vistazo a', 'echale un vistazo a', 'echenle un vistazo a', 'chequea', 'chequeen',
@@ -106,7 +139,7 @@ const CPT_SUGGESTION_INTROS = [
 ];
 
 // Hosting / code platforms that strongly suggest a shared project, even with no intro phrase.
-const CPT_PROJECT_HOST_RE = /(?:^|[\s(])(?:https?:\/\/)?(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org|codeberg\.org|[\w-]+\.github\.io|[\w-]+\.vercel\.app|[\w-]+\.netlify\.app|[\w-]+\.pages\.dev|[\w-]+\.glitch\.me|[\w-]+\.itch\.io|huggingface\.co\/spaces|replit\.com\/@|npmjs\.com\/package|pypi\.org\/project|chromewebstore\.google\.com|chrome\.google\.com\/webstore|addons\.mozilla\.org|marketplace\.visualstudio\.com|play\.google\.com\/store\/apps|apps\.apple\.com)\/?[^\s]*/i;
+const CPT_PROJECT_HOST_RE = /(?:^|[\s(])(?:https?:\/\/)?(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org|codeberg\.org|[\w-]+\.github\.io|[\w-]+\.vercel\.app|[\w-]+\.netlify\.app|[\w-]+\.pages\.dev|[\w-]+\.glitch\.me|[\w-]+\.itch\.io|huggingface\.co\/spaces|replit\.com\/@|npmjs\.com\/package|pypi\.org\/project|chromewebstore\.google\.com|chrome\.google\.com\/webstore|addons\.mozilla\.org|marketplace\.visualstudio\.com|play\.google\.com\/store\/apps|apps\.apple\.com|store\.steampowered\.com\/app|steamcommunity\.com\/sharedfiles|store\.epicgames\.com|gog\.com\/(?:[a-z]{2}\/)?game|roblox\.com\/games|gamejolt\.com\/games|(?:[\w-]+\.)?etsy\.com|instagram\.com|(?:[\w-]+\.)?artstation\.com|deviantart\.com|behance\.net)\/?[^\s]*/i;
 
 function cptEscapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -135,6 +168,102 @@ const CPT_SUGGESTION_RE = new RegExp(
 const CPT_CREATION_RE = new RegExp(
   `(?:^|[^\\w'])(?:${cptAlternation(CPT_CREATION_INTROS)})${CPT_GAP}\\s+(?:${cptAlternation(CPT_NOUNS.concat(CPT_CREATION_ONLY_NOUNS))})(?![\\w])`
 );
+// Any share intro + a non-media link counts as a site to review ("check this out https://my-shop.com").
+const CPT_LINK_INTRO_RE = new RegExp(
+  `(?:^|[^\\w'])(?:${cptAlternation(CPT_ATTENTION_INTROS.concat(CPT_CREATION_INTROS))})(?![\\w])`
+);
+
+function cptWords(list) {
+  return new RegExp(`(?:^|[^\\w])(?:${cptAlternation(list)})(?![\\w])`);
+}
+
+// Keyword classes used when neither a command nor the link decides the category.
+const CPT_ART_WORDS_RE = cptWords([
+  'art', 'artwork', 'fanart', 'fan art', 'painting', 'paintings', 'drawing', 'drawings', 'sketch', 'illustration',
+  'sculpture', 'crochet', 'knitting', 'knitted', 'amigurumi', 'amigurumis', 'handmade', 'hand made', 'craft', 'crafts',
+  'diy', 'jewelry', 'jewellery', 'pottery', 'ceramics', 'embroidery', 'cosplay', 'miniature', 'miniatures', 'figurine',
+  'commission', 'commissions', 'watercolor', 'portrait',
+  'cuadro', 'cuadros', 'pintura', 'pinturas', 'dibujo', 'dibujos', 'ilustracion', 'escultura', 'ganchillo', 'tejido',
+  'tejidos', 'artesania', 'artesanias', 'manualidad', 'manualidades', 'hecho a mano', 'hechos a mano', 'joyeria',
+  'ceramica', 'bordado', 'bordados', 'acuarela', 'retrato',
+  'quadro', 'quadri', 'dipinto', 'dipinti', 'disegno', 'disegni', 'illustrazione', 'scultura', 'uncinetto',
+  'fatto a mano', 'fatti a mano', 'artigianato', 'gioielli', 'ricamo', 'acquerello', 'ritratto'
+]);
+const CPT_GAME_WORDS_RE = cptWords([
+  'game', 'games', 'videogame', 'videogames', 'video game', 'indie game', 'game jam', 'gamejam', 'gameplay', 'roguelike',
+  'metroidvania', 'speedrun', 'juego', 'juegos', 'videojuego', 'videojuegos', 'gioco', 'giochi', 'videogioco',
+  'videogiochi', 'jogo', 'steam'
+]);
+const CPT_TECH_WORDS_RE = cptWords([
+  'app', 'apps', 'application', 'webapp', 'web app', 'tool', 'repo', 'repository', 'bot', 'extension', 'plugin',
+  'library', 'lib', 'package', 'framework', 'api', 'cli', 'script', 'dashboard', 'saas', 'widget', 'code', 'open source',
+  'open-source', 'software', 'github', 'gitlab', 'aplicacion', 'herramienta', 'libreria', 'biblioteca', 'paquete',
+  'programa', 'codigo', 'applicazione', 'strumento', 'pacchetto', 'programma', 'codice', 'estensione'
+]);
+const CPT_WEB_WORDS_RE = cptWords([
+  'website', 'websites', 'site', 'web site', 'webpage', 'web page', 'homepage', 'landing page', 'portfolio', 'blog', 'web',
+  'pagina web', 'pagina', 'sitio', 'sitio web', 'portafolio', 'sito', 'sito web', 'portale', 'portal'
+]);
+
+// Art shares that need no noun: "I painted this", "tejí esto", "ho dipinto questo".
+const CPT_ART_VERB_RE = cptWords([
+  'i painted', 'i drew', 'i sketched', 'i sculpted', 'i knitted', 'i crocheted', 'i sewed', 'i carved', 'i embroidered',
+  'i illustrated', "i've painted", "i've drawn", "i've sculpted", "i've knitted", "i've crocheted", "i've sewn",
+  'i have painted', 'i have drawn', 'just painted', 'just drew', 'just finished painting', 'just finished drawing',
+  'pinte', 'dibuje', 'teji', 'esculpi', 'he pintado', 'he dibujado', 'he tejido', 'acabo de pintar', 'acabo de dibujar',
+  'acabo de tejer', 'estoy pintando', 'estoy dibujando', 'estoy tejiendo',
+  'ho dipinto', 'ho disegnato', 'ho cucito', 'ho scolpito', 'ho ricamato', 'ho lavorato a maglia', "ho fatto all'uncinetto",
+  'sto dipingendo', 'sto disegnando'
+]);
+
+// "you should play <title>", "deberías jugar <title>", "dovresti giocare a <title>"
+const CPT_GAME_SUGGESTION_RE = new RegExp(`(?:^|[^\\w'])(?:${cptAlternation([
+  'you should play', 'you should try playing', 'you gotta play', 'you have to play', 'you need to play', 'you must play',
+  'have you played', 'have you ever played', 'have you tried playing', 'try playing', 'please play', 'pls play', 'plz play',
+  'can you play', 'could you play', 'will you play', 'would you play', 'game suggestion', 'game recommendation', 'game rec',
+  'deberias jugar', 'tienes que jugar', 'tenes que jugar', 'teneis que jugar', 'juega al', 'juega a', 'jueguen', 'jugad',
+  'has jugado', 'jugaste', 'podrias jugar', 'puedes jugar', 'podes jugar', 'te recomiendo jugar', 'te recomiendo el juego',
+  'recomiendo el juego', 'juego recomendado',
+  'dovresti giocare', 'devi giocare', 'hai mai giocato', 'hai giocato', 'potresti giocare', 'puoi giocare', 'gioca a',
+  'prova a giocare', 'ti consiglio di giocare', 'ti consiglio il gioco', 'consiglio di gioco'
+])})(?![\\w'])`);
+// Words right after "play" that mean it is not a game title ("can you play that song again", "play more aggressive").
+const CPT_GAME_STOP_RE = new RegExp(`^(?:${cptAlternation([
+  'more', 'again', 'it', 'that', 'this', 'those', 'these', 'with', 'now', 'ranked', 'today', 'tonight', 'tomorrow',
+  'something', 'anything', 'better', 'well', 'safe', 'solo', 'duo', 'music', 'song', 'songs', 'the song', 'a song',
+  'some music', 'me', 'us', 'around', 'along', 'too', 'here', 'there', 'for', 'so', 'like',
+  'mas', 'otra', 'otro', 'eso', 'esto', 'ahora', 'manana', 'hoy', 'bien', 'con', 'musica', 'la cancion', 'una cancion',
+  'ancora', 'questo', 'quello', 'adesso', 'domani', 'oggi', 'bene', 'la canzone', 'una canzone', 'meglio'
+])})(?![\\w])`);
+
+// Stream discussion topics, challenges and Q&A questions (EN / ES / IT).
+const CPT_TOPIC_PATTERNS = [
+  /\b(?:stream |discussion |debate )?topic(?: idea| suggestion| for (?:the )?(?:next )?(?:stream|chat))?\s*:/,
+  /\blet'?s (?:talk|chat|discuss) about\b/,
+  /\b(?:we|you) should (?:talk|chat) about\b/,
+  /\b(?:can|could) you (?:talk|chat) about\b/,
+  /\bquestion for (?:the )?(?:streamer|stream|chat|q&a)\b\s*:?/,
+  /\bq ?& ?a(?: topic| question)?\s*:/,
+  /\b(?:stream |community )?challenge(?: idea)?\s*:/,
+  /\byou should do (?:an?|the) (?:[\w-]+ ){0,3}challenge\b/,
+  /\bdebate\s*:/,
+  /\btemas? para (?:el |un )?(?:proximo )?(?:stream|directo|vivo)\b\s*:?/,
+  /\btema\s*:/,
+  /\bhablemos (?:de|sobre)\b/,
+  /\b(?:deberias|podrias|podes|puedes) hablar (?:de|sobre)\b/,
+  /\bpregunta para (?:el stream|el streamer|ti|vos|el chat)\b\s*:?/,
+  /\b(?:reto|desafio)(?: para el stream)?\s*:/,
+  /\b(?:deberias|podrias) hacer (?:un|el) (?:reto|desafio)\b/,
+  /\bargomento(?: per (?:la live|lo stream))?\s*:/,
+  /\bparliamo (?:di|del|della|dei|delle)\b/,
+  /\b(?:dovresti|potresti) parlare (?:di|del|della|dei|delle)\b/,
+  /\bdomanda per (?:te|la live|lo stream|lo streamer|la chat)\b\s*:?/,
+  /\bsfida(?: per la live)?\s*:/,
+  /\b(?:dovresti|potresti) fare una sfida\b/
+];
+
+const CPT_TITLE_FILLER_RE = /\s+(?:next|tonight|today|tomorrow|on stream|live|please|pls|plz|por favor|porfa|en el stream|en directo|en vivo|per favore|in live|stasera|domani|hoy|ma[nñ]ana|esta noche|again|sometime|lol|xd)$/i;
+const CPT_TITLE_TAIL_RE = /\s+(?:it'?s|its|it is|is so|is really|is amazing|is great|es muy|es re|es buen\S*|es genial|est[aá] buen\S*|[eè] molto|[eè] bellissimo|because|porque|perch[eé]|so good|which|que es|che [eè])(?=\s|$).*$/i;
 
 class ChatProjectTracker {
   constructor(options = {}) {
@@ -146,8 +275,12 @@ class ChatProjectTracker {
     this.overlayDuration = Number(options.overlayDuration) > 0 ? Number(options.overlayDuration) : 8000;
     this.filterState = 'all'; // 'all', 'new', 'reviewed'
     this.tagFilter = null;
+    this.categoryFilter = null;
     this.searchQuery = '';
     this.sortMode = 'newest'; // 'newest' | 'votes'
+    this.streamMode = 'all'; // 'all' or a category key: only that category is captured
+    this.skippedCount = 0;
+    this.onSkipped = options.onSkipped || null;
     this.seq = 0;
     this.onAirId = null;
     this.bumpId = null;
@@ -157,9 +290,9 @@ class ChatProjectTracker {
   }
 
   /**
-   * Evaluates if a chat message contains a project proposal, idea, or repo link.
-   * @param {Object} msg - { id, author, text, color, timestamp }
-   * @returns {Object|null} Extracted project data or null if not a project
+   * Evaluates if a chat message contains something to showcase: a game, project, website, artwork or topic.
+   * @param {Object} msg - { id, author, text, color, timestamp, platform }
+   * @returns {Object|null} Extracted item (with `category`) or null if the message is just chat
    */
   analyzeMessage(msg) {
     if (!msg || !msg.text) return null;
@@ -167,34 +300,47 @@ class ChatProjectTracker {
     if (!text) return null;
     const norm = cptNormalize(text);
 
-    let kind = null; // 'command' | 'link' | 'intro' | 'idea'
+    let kind = null; // 'command' | 'link' | 'intro' | 'idea' | 'game'
     let command = '';
+    let forced = '';
     let title = '';
     let description = text;
     const url = this.extractUrl(text);
+    const host = this.hostOf(url);
 
-    // 1. Explicit triggers: !project, !idea, !proyecto, !app, !progetto, !repo
-    const commandMatch = text.match(/^!(project|proyecto|projeto|progetto|idea|idee|app|repo)\s+(.+)/i);
+    // 1. Explicit triggers: !game, !project, !site, !art, !idea ... (see CPT_COMMANDS)
+    const commandMatch = text.match(CPT_COMMAND_RE);
+    const commandKey = commandMatch ? cptNormalize(commandMatch[1]) : '';
 
-    if (commandMatch) {
+    if (commandMatch && CPT_COMMANDS[commandKey]) {
       kind = 'command';
-      command = commandMatch[1].toLowerCase();
+      command = commandKey;
+      forced = CPT_COMMANDS[commandKey];
       const content = commandMatch[2].trim();
       title = content.split(/\s+[-–—:|]\s+/)[0] || content.slice(0, 35);
+      if (/^https?:\/\/\S+$/i.test(title)) title = this.titleFromUrl(url) || host;
       description = content;
     } else {
       // 2. Natural language detection (English, Spanish, Italian)
-      const ideaMatch = CPT_IDEA_PATTERNS.some(re => re.test(norm)) || CPT_SUGGESTION_RE.test(norm);
-      if (ideaMatch) {
+      let topic = null;
+      let game = null;
+      if ((topic = this.matchTopic(text, norm))) {
         kind = 'idea';
-      } else if (CPT_CREATION_RE.test(norm) || CPT_ATTENTION_RE.test(norm)) {
+      } else if (CPT_IDEA_PATTERNS.some(re => re.test(norm)) || CPT_SUGGESTION_RE.test(norm)) {
+        kind = 'idea';
+      } else if ((game = this.matchGameSuggestion(text, norm)) && (game.title || CPT_GAMING_HOST_RE.test(host))) {
+        kind = 'game';
+        forced = 'gaming';
+      } else if (CPT_CREATION_RE.test(norm) || CPT_ATTENTION_RE.test(norm) || CPT_ART_VERB_RE.test(norm)) {
         kind = 'intro';
       } else if (CPT_PROJECT_HOST_RE.test(text)) {
         kind = 'link';
+      } else if (host && !CPT_MEDIA_HOST_RE.test(host) && CPT_LINK_INTRO_RE.test(norm)) {
+        kind = 'intro';
       }
 
       if (kind) {
-        title = this.titleFromUrl(url) || this.titleFromText(text, kind);
+        title = this.titleFromUrl(url) || (kind === 'game' && game.title) || (topic && topic.title) || '';
       }
     }
 
@@ -204,7 +350,7 @@ class ChatProjectTracker {
       id: msg.id || 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       author: msg.author || 'Viewer',
       authorColor: msg.color || '#60a5fa',
-      title: title || 'Nuovo Progetto',
+      title: title,
       description: description,
       url: url,
       status: 'new', // 'new' | 'reviewed'
@@ -213,8 +359,85 @@ class ChatProjectTracker {
       voters: [],
       timestamp: msg.timestamp || Date.now()
     };
-    project.tags = this.detectTags(project, { kind, command, norm });
+    project.category = this.detectCategory(project, { kind, forced, norm });
+    if (!project.title) {
+      project.title = (project.category === 'web' && host) || this.titleFromText(text, kind) || 'New Item';
+    }
+    project.tags = this.detectTags(project, { kind, command, norm, category: project.category });
     return project;
+  }
+
+  /** Category precedence: command > link host > idea/topic phrasing > keywords > any website link. */
+  detectCategory(project, ctx = {}) {
+    if (CPT_CATEGORIES[ctx.forced]) return ctx.forced;
+    const host = this.hostOf(project.url);
+    if (host) {
+      if (CPT_GAMING_HOST_RE.test(host)) return 'gaming';
+      if (CPT_ART_HOST_RE.test(host)) return 'art';
+      if (CPT_CODE_HOST_RE.test(host)) return 'tech';
+    }
+    if (ctx.kind === 'idea') return 'idea';
+    const norm = (ctx.norm || cptNormalize(`${project.title || ''} ${project.description || ''}`))
+      .replace(/https?:\/\/\S+/g, ' ')
+      .replace(/\S+\.\S+\/\S*/g, ' ');
+    if (CPT_ART_WORDS_RE.test(norm) || CPT_ART_VERB_RE.test(norm)) return 'art';
+    if (CPT_GAME_WORDS_RE.test(norm)) return 'gaming';
+    if (CPT_TECH_WORDS_RE.test(norm)) return 'tech';
+    if (CPT_WEB_WORDS_RE.test(norm)) return 'web';
+    if (host && !CPT_MEDIA_HOST_RE.test(host)) return 'web';
+    return 'tech';
+  }
+
+  /** Returns { title } for stream topics / challenges / Q&A questions, otherwise null. */
+  matchTopic(text, norm) {
+    for (const re of CPT_TOPIC_PATTERNS) {
+      const m = re.exec(norm);
+      if (m) {
+        const rest = this.sliceAligned(text, norm, m.index + m[0].length).replace(/^\s*[:\-–—]?\s*/, '');
+        return { title: this.capitalize(this.cleanTitle(rest)) };
+      }
+    }
+    return null;
+  }
+
+  /** Returns { title } for "you should play <game>"-style suggestions, otherwise null. */
+  matchGameSuggestion(text, norm) {
+    const m = CPT_GAME_SUGGESTION_RE.exec(norm);
+    if (!m) return null;
+    let start = m.index + m[0].length;
+    start += norm.slice(start).match(/^\s*:?\s*(?:(?:a|al|to)\s+)?/)[0].length;
+    const rest = norm.slice(start);
+    if (!rest.trim() || CPT_GAME_STOP_RE.test(rest)) return null;
+    return { title: this.capitalize(this.cleanTitle(this.sliceAligned(text, norm, start), true)) };
+  }
+
+  // Accent stripping usually keeps string length, so indexes found in `norm` map back onto the original text.
+  sliceAligned(text, norm, start) {
+    return text.length === norm.length ? text.slice(start) : norm.slice(start);
+  }
+
+  cleanTitle(raw, isGame = false) {
+    let s = String(raw || '').replace(/https?:\/\/\S+/gi, ' ').replace(/\s+/g, ' ').trim();
+    s = s.split(/\s+[-–—|]\s+|[!?;(\n]|[.,:](?:\s|$)/)[0].trim();
+    if (isGame) {
+      s = s.replace(CPT_TITLE_TAIL_RE, '');
+      for (let i = 0; i < 3; i++) s = s.replace(CPT_TITLE_FILLER_RE, '').trim();
+    }
+    s = s.replace(/^["'“”«»]+|["'“”«»]+$/g, '').replace(/[^\p{L}\p{N})\]'"+]+$/u, '').trim();
+    const words = s.split(/\s+/).filter(Boolean);
+    return words.slice(0, 6).join(' ') + (words.length > 6 ? '...' : '');
+  }
+
+  capitalize(s) {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+
+  hostOf(url) {
+    try {
+      return url ? new URL(url).hostname.replace(/^www\./, '').toLowerCase() : '';
+    } catch (e) {
+      return '';
+    }
   }
 
   extractUrl(text) {
@@ -227,6 +450,13 @@ class ChatProjectTracker {
     return url.replace(/[.,;:!?)\]}]+$/, '');
   }
 
+  slugTitle(slug) {
+    let v = String(slug || '');
+    try { v = decodeURIComponent(v); } catch (e) { /* keep raw slug */ }
+    return v.replace(/[-_+]+/g, ' ').trim().split(/\s+/).filter(Boolean).slice(0, 6)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+
   titleFromUrl(url) {
     if (!url) return '';
     let parsed;
@@ -235,13 +465,24 @@ class ChatProjectTracker {
     } catch (e) {
       return '';
     }
-    const host = parsed.hostname.replace(/^www\./, '');
+    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
     const parts = parsed.pathname.split('/').filter(Boolean);
     if (/^(github\.com|gitlab\.com|bitbucket\.org|codeberg\.org)$/.test(host) && parts.length >= 2) {
       return parts[1].replace(/\.git$/, '');
     }
-    const sub = host.match(/^([\w-]+)\.(?:vercel\.app|netlify\.app|pages\.dev|glitch\.me|itch\.io|github\.io)$/);
+    const sub = host.match(/^([\w-]+)\.(?:vercel\.app|netlify\.app|pages\.dev|glitch\.me|itch\.io|github\.io|artstation\.com)$/);
     if (sub) return host.endsWith('github.io') && parts[0] ? parts[0] : sub[1];
+    if (host === 'store.steampowered.com' && parts[0] === 'app' && parts[2]) return this.slugTitle(parts[2]);
+    if (host === 'store.epicgames.com' && parts.indexOf('p') >= 0) return this.slugTitle(parts[parts.indexOf('p') + 1]);
+    if (host === 'gog.com' && parts.indexOf('game') >= 0) return this.slugTitle(parts[parts.indexOf('game') + 1]);
+    if (host === 'roblox.com' && parts[0] === 'games' && parts[2]) return this.slugTitle(parts[2]);
+    if (/(?:^|\.)etsy\.com$/.test(host)) {
+      if (parts[0] === 'shop' && parts[1]) return parts[1];
+      if (parts[0] === 'listing' && parts[2]) return this.slugTitle(parts[2]);
+    }
+    if (host === 'instagram.com' && parts[0] && !/^(p|reel|reels|stories|tv|explore)$/.test(parts[0])) return '@' + parts[0];
+    if (host === 'artstation.com' && parts[0] && parts[0] !== 'artwork') return parts[0];
+    if (host === 'deviantart.com' && parts[1] === 'art' && parts[2]) return this.slugTitle(parts[2].replace(/-\d+$/, ''));
     return '';
   }
 
@@ -259,16 +500,18 @@ class ChatProjectTracker {
     const tags = new Set();
     const norm = (ctx.norm || cptNormalize(`${project.title} ${project.description}`)).replace(/(?:https?:\/\/)?\S+\.\S+\/\S*/g, ' ');
     const command = ctx.command || '';
-    let host = '';
-    try {
-      host = project.url ? new URL(project.url).hostname.replace(/^www\./, '') : '';
-    } catch (e) { /* ignore malformed URLs */ }
+    const category = ctx.category || project.category || '';
+    const host = this.hostOf(project.url);
 
     if (host) {
       if (host === 'github.com' || host.endsWith('.github.io')) tags.add('GitHub');
       else if (host === 'gitlab.com') tags.add('GitLab');
       else if (host.endsWith('vercel.app')) tags.add('Vercel');
       else if (host.endsWith('netlify.app')) tags.add('Netlify');
+      else if (/(?:^|\.)(?:steampowered|steamcommunity)\.com$/.test(host)) tags.add('Steam');
+      else if (/(?:^|\.)itch\.io$/.test(host)) tags.add('itch.io');
+      else if (/(?:^|\.)etsy\.com$/.test(host)) tags.add('Etsy');
+      else if (host === 'instagram.com') tags.add('Instagram');
       else tags.add('Web');
     }
 
@@ -277,7 +520,7 @@ class ChatProjectTracker {
     if (command === 'app' || appHost || appWord) tags.add('App');
 
     if (ctx.kind === 'idea' || command === 'idea' || command === 'idee') tags.add('Idea');
-    if (tags.size === 0) tags.add('Project');
+    if (tags.size === 0 && (!category || category === 'tech')) tags.add('Project');
 
     return CPT_TAG_ORDER.filter(t => tags.has(t));
   }
@@ -290,6 +533,13 @@ class ChatProjectTracker {
 
     const project = this.analyzeMessage(msg);
     if (!project) return false;
+
+    if (this.streamMode !== 'all' && project.category !== this.streamMode) {
+      this.skippedCount++;
+      this.renderStreamMode();
+      if (typeof this.onSkipped === 'function') this.onSkipped(project);
+      return false;
+    }
 
     // Avoid exact duplicate descriptions from the same author
     const exists = this.projects.some(p => p.author === project.author && p.description === project.description);
@@ -356,6 +606,23 @@ class ChatProjectTracker {
     this.render();
   }
 
+  // ---------- Categories & Stream Mode ----------
+
+  /** Restricts which category chat submissions are captured for ('all' accepts everything). */
+  setStreamMode(mode) {
+    this.streamMode = CPT_CATEGORIES[mode] ? mode : 'all';
+    this.skippedCount = 0;
+    this.saveProjects();
+    this.render();
+    const cat = CPT_CATEGORIES[this.streamMode];
+    this.showToast(cat ? `Stream Mode: only ${cat.icon} ${cat.label} today` : 'Stream Mode: accepting all categories');
+  }
+
+  setCategoryFilter(category) {
+    this.categoryFilter = CPT_CATEGORIES[category] && category !== this.categoryFilter ? category : null;
+    this.render();
+  }
+
   // ---------- Broadcast overlay ----------
 
   showOnStream(projectId) {
@@ -369,17 +636,21 @@ class ChatProjectTracker {
     const desc = String(p.description || '').split(p.url || '\u0000').join(' ').replace(/\s+/g, ' ').replace(/[\s:,-]+$/, '').trim();
     const linkLabel = url ? url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '') : '';
     const platform = CPT_PLATFORM_LABELS[p.platform];
+    const catKey = CPT_CATEGORIES[p.category] ? p.category : 'tech';
+    const cat = CPT_CATEGORIES[catKey];
 
     const el = document.createElement('div');
-    el.className = 'cpt-overlay';
+    el.className = `cpt-overlay cpt-cat-${catKey}`;
     el.setAttribute('role', 'status');
     el.setAttribute('aria-live', 'polite');
     el.style.setProperty('--cpt-overlay-duration', `${this.overlayDuration}ms`);
     el.innerHTML = `
       <div class="cpt-overlay-accent"></div>
+      <div class="cpt-overlay-icon" aria-hidden="true">${cat.icon}</div>
       <div class="cpt-overlay-body">
         <div class="cpt-overlay-eyebrow">
-          <span class="cpt-overlay-live"><span class="cpt-overlay-dot"></span>Community Project</span>
+          <span class="cpt-overlay-live"><span class="cpt-overlay-dot"></span>${esc(cat.overlay)}</span>
+          <span class="cpt-overlay-chip cpt-overlay-cat">${cat.icon} ${esc(cat.name)}</span>
           ${p.num ? `<span class="cpt-overlay-chip">#${esc(p.num)}</span>` : ''}
           ${platform ? `<span class="cpt-overlay-chip cpt-platform-${esc(p.platform)}">${esc(platform)}</span>` : ''}
           <span class="cpt-overlay-chip cpt-overlay-votes">▲ ${esc(p.votes || 0)}</span>
@@ -387,7 +658,7 @@ class ChatProjectTracker {
         <div class="cpt-overlay-title">${esc(p.title)}</div>
         <div class="cpt-overlay-author">by <span style="color: ${this.safeColor(p.authorColor)}">@${esc(p.author)}</span></div>
         ${desc ? `<div class="cpt-overlay-desc">${esc(desc)}</div>` : ''}
-        ${url ? `<a class="cpt-overlay-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(linkLabel)}</a>` : ''}
+        ${url ? `<a class="cpt-overlay-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${cat.link} ${esc(linkLabel)}</a>` : ''}
       </div>
       <button class="cpt-overlay-close" type="button" aria-label="Hide overlay">✕</button>
       <div class="cpt-overlay-progress"></div>
@@ -446,14 +717,14 @@ class ChatProjectTracker {
   clearAll(skipConfirm = false) {
     if (this.projects.length === 0) return false;
     if (!skipConfirm && typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      if (!window.confirm(`Delete all ${this.projects.length} captured projects? This cannot be undone.`)) return false;
+      if (!window.confirm(`Delete all ${this.projects.length} captured items? This cannot be undone.`)) return false;
     }
     this.hideOverlay();
     this.projects = [];
     this.seq = 0;
     this.saveProjects();
     this.render();
-    this.showToast('All projects cleared');
+    this.showToast('All items cleared');
     return true;
   }
 
@@ -489,17 +760,24 @@ class ChatProjectTracker {
     try {
       const meta = JSON.parse(storage.getItem(`${this.storageKey}_meta`) || '{}') || {};
       if (meta.sortMode === 'votes') this.sortMode = 'votes';
+      if (CPT_CATEGORIES[meta.streamMode]) this.streamMode = meta.streamMode;
       const parsed = JSON.parse(storage.getItem(this.storageKey) || '[]');
       if (!Array.isArray(parsed)) return [];
       const projects = parsed
         .filter(p => p && typeof p === 'object' && p.id)
-        .map(p => ({
-          ...p,
-          status: p.status === 'reviewed' ? 'reviewed' : 'new',
-          tags: Array.isArray(p.tags) && p.tags.length ? p.tags : this.detectTags(p),
-          votes: Math.max(0, parseInt(p.votes, 10) || 0),
-          voters: Array.isArray(p.voters) ? p.voters : []
-        }));
+        .map(p => {
+          const item = {
+            ...p,
+            status: p.status === 'reviewed' ? 'reviewed' : 'new',
+            votes: Math.max(0, parseInt(p.votes, 10) || 0),
+            voters: Array.isArray(p.voters) ? p.voters : []
+          };
+          if (!CPT_CATEGORIES[item.category]) {
+            item.category = this.detectCategory(item, { kind: (item.tags || []).includes('Idea') ? 'idea' : 'intro' });
+          }
+          if (!Array.isArray(item.tags) || !item.tags.length) item.tags = this.detectTags(item);
+          return item;
+        });
       // Never reuse a vote number, even after deletions; number legacy projects oldest-first.
       this.seq = Math.max(parseInt(meta.seq, 10) || 0, ...projects.map(p => p.num || 0), 0);
       projects.filter(p => !p.num).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)).forEach(p => { p.num = ++this.seq; });
@@ -515,7 +793,7 @@ class ChatProjectTracker {
     if (!storage) return;
     try {
       storage.setItem(this.storageKey, JSON.stringify(this.projects));
-      storage.setItem(`${this.storageKey}_meta`, JSON.stringify({ seq: this.seq, sortMode: this.sortMode }));
+      storage.setItem(`${this.storageKey}_meta`, JSON.stringify({ seq: this.seq, sortMode: this.sortMode, streamMode: this.streamMode }));
     } catch (e) {
       console.warn('[ChatProjectTracker] Could not save projects:', e);
     }
@@ -546,13 +824,13 @@ class ChatProjectTracker {
   async copyMarkdown() {
     const reviewed = this.projects.filter(p => p.status === 'reviewed');
     if (reviewed.length === 0) {
-      this.showToast('No reviewed projects to copy yet', 'warn');
+      this.showToast('No reviewed items to copy yet', 'warn');
       return false;
     }
     const md = this.toMarkdown(reviewed);
     const ok = await this.copyToClipboard(md);
     this.showToast(
-      ok ? `Copied ${reviewed.length} reviewed project${reviewed.length === 1 ? '' : 's'} as Markdown` : 'Could not access the clipboard',
+      ok ? `Copied ${reviewed.length} reviewed item${reviewed.length === 1 ? '' : 's'} as Markdown` : 'Could not access the clipboard',
       ok ? 'success' : 'error'
     );
     return ok;
@@ -623,9 +901,11 @@ class ChatProjectTracker {
     const sorter = this.sortMode === 'votes' ? (a, b) => (b.votes || 0) - (a.votes || 0) || byNewest(a, b) : byNewest;
     return this.projects.filter(p => {
       if (this.filterState !== 'all' && p.status !== this.filterState) return false;
+      if (this.categoryFilter && p.category !== this.categoryFilter) return false;
       if (this.tagFilter && !(p.tags || []).includes(this.tagFilter)) return false;
       if (terms.length) {
-        const haystack = cptNormalize([p.title, p.author, p.description, p.url, (p.tags || []).join(' ')].join(' '));
+        const cat = CPT_CATEGORIES[p.category] || {};
+        const haystack = cptNormalize([p.title, p.author, p.description, p.url, (p.tags || []).join(' '), cat.name, cat.label].join(' '));
         return terms.every(t => haystack.includes(t));
       }
       return true;
@@ -642,25 +922,33 @@ class ChatProjectTracker {
         <div class="cpt-header">
           <div class="cpt-header-top">
             <div class="cpt-title-wrap">
-              <div class="cpt-icon">💡</div>
+              <div class="cpt-icon">✨</div>
               <div>
-                <h3 class="cpt-title">Live Project Tracker</h3>
-                <p class="cpt-subtitle">AI-powered chat proposals for stream</p>
+                <h3 class="cpt-title">Live Showcase &amp; Community Queue</h3>
+                <p class="cpt-subtitle">Games, tech, sites, art &amp; topics from chat</p>
               </div>
             </div>
-            <span class="cpt-badge-count" id="cpt-counter">0 Projects</span>
+            <span class="cpt-badge-count" id="cpt-counter">0 Items</span>
           </div>
           <div class="cpt-search-row">
             <div class="cpt-search-wrap">
               <span class="cpt-search-icon">🔍</span>
-              <input type="search" class="cpt-search" id="cpt-search" placeholder="Search title, author, keywords..." autocomplete="off" aria-label="Search projects">
+              <input type="search" class="cpt-search" id="cpt-search" placeholder="Search title, author, category..." autocomplete="off" aria-label="Search items">
             </div>
             <div class="cpt-sort-toggle" role="group" aria-label="Sort projects">
               <button class="cpt-sort-btn" data-action="sort" data-sort="newest" title="Sort by Newest">🕒 Newest</button>
               <button class="cpt-sort-btn" data-action="sort" data-sort="votes" title="Sort by Most Upvoted">▲ Most Upvoted</button>
             </div>
           </div>
-          <div class="cpt-tag-filters" id="cpt-tag-filters" aria-label="Filter by tag"></div>
+          <div class="cpt-tag-filters cpt-cat-filters" id="cpt-cat-filters" aria-label="Filter by category"></div>
+          <div class="cpt-mode-row" id="cpt-mode-row">
+            <label class="cpt-mode-label" for="cpt-stream-mode">🎯 Stream Mode</label>
+            <select class="cpt-mode-select" id="cpt-stream-mode">
+              <option value="all">🌈 All categories</option>
+              ${CPT_CATEGORY_ORDER.map(c => `<option value="${c}">Only ${CPT_CATEGORIES[c].icon} ${this.escapeHtml(CPT_CATEGORIES[c].label)} today</option>`).join('')}
+            </select>
+            <span class="cpt-mode-note" id="cpt-mode-note"></span>
+          </div>
         </div>
 
         <div class="cpt-actions">
@@ -671,7 +959,7 @@ class ChatProjectTracker {
             <button class="cpt-btn cpt-filter-btn" data-action="filter" data-filter="new">New</button>
             <button class="cpt-btn cpt-filter-btn" data-action="filter" data-filter="reviewed">Reviewed</button>
           </div>
-          <button class="cpt-btn cpt-btn-danger" data-action="clear-all" title="Delete all captured projects">🗑 Clear All</button>
+          <button class="cpt-btn cpt-btn-danger" data-action="clear-all" title="Delete all captured items">🗑 Clear All</button>
         </div>
 
         <div class="cpt-list" id="cpt-list-items">
@@ -682,17 +970,19 @@ class ChatProjectTracker {
 
     const searchEl = container.querySelector('#cpt-search');
     searchEl.addEventListener('input', e => this.setSearch(e.target.value));
+    container.querySelector('#cpt-stream-mode').addEventListener('change', e => this.setStreamMode(e.target.value));
 
     container.addEventListener('click', e => {
       const btn = e.target.closest('[data-action]');
       if (!btn || !container.contains(btn)) return;
-      const { action, id, filter, tag, sort } = btn.dataset;
+      const { action, id, filter, tag, sort, category } = btn.dataset;
       switch (action) {
         case 'export-json': this.exportJSON(); break;
         case 'copy-md': this.copyMarkdown(); break;
         case 'clear-all': this.clearAll(); break;
         case 'filter': this.setFilter(filter); break;
         case 'tag': this.setTagFilter(tag); break;
+        case 'category': this.setCategoryFilter(category); break;
         case 'sort': this.setSort(sort); break;
         case 'show': this.onAirId === id ? this.hideOverlay() : this.showOnStream(id); break;
         case 'toggle': this.toggleStatus(id); break;
@@ -703,19 +993,35 @@ class ChatProjectTracker {
     this.render();
   }
 
-  renderTagFilters() {
-    const el = document.getElementById('cpt-tag-filters');
+  renderCategoryFilters() {
+    const el = document.getElementById('cpt-cat-filters');
     if (!el) return;
+    const esc = v => this.escapeHtml(v);
     const counts = {};
-    this.projects.forEach(p => (p.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
-    const tags = CPT_TAG_ORDER.filter(t => counts[t]).concat(Object.keys(counts).filter(t => !CPT_TAG_ORDER.includes(t)));
-    if (this.tagFilter && !counts[this.tagFilter]) this.tagFilter = null;
+    this.projects.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+    if (this.tagFilter && !this.projects.some(p => (p.tags || []).includes(this.tagFilter))) this.tagFilter = null;
 
-    const chip = (tag, label, active) => `
-      <button class="cpt-tag-chip cpt-tag-${this.escapeHtml(String(tag || 'all').toLowerCase())} ${active ? 'cpt-active' : ''}"
-        data-action="tag" data-tag="${this.escapeHtml(tag)}" aria-pressed="${active}">${label}</button>`;
-    el.innerHTML = chip('', 'All tags', !this.tagFilter) +
-      tags.map(t => chip(t, `${this.escapeHtml(t)} <span class="cpt-chip-count">${counts[t]}</span>`, this.tagFilter === t)).join('');
+    const chip = (key, label, count) => {
+      const active = key ? this.categoryFilter === key : !this.categoryFilter;
+      return `
+      <button class="cpt-tag-chip cpt-cat-chip ${key ? `cpt-cat-${key}` : ''} ${active ? 'cpt-active' : ''} ${count ? '' : 'cpt-empty'}"
+        data-action="category" data-category="${key}" aria-pressed="${active}">${label} <span class="cpt-chip-count">${count}</span></button>`;
+    };
+    el.innerHTML = chip('', 'All', this.projects.length) +
+      CPT_CATEGORY_ORDER.map(c => chip(c, `${CPT_CATEGORIES[c].icon} ${esc(CPT_CATEGORIES[c].label)}`, counts[c] || 0)).join('') +
+      (this.tagFilter ? `<button class="cpt-tag-chip cpt-tag-pill cpt-active" data-action="tag" data-tag="${esc(this.tagFilter)}" title="Clear tag filter">🏷 ${esc(this.tagFilter)} ✕</button>` : '');
+  }
+
+  renderStreamMode() {
+    if (typeof document === 'undefined') return;
+    const row = document.getElementById('cpt-mode-row');
+    if (!row) return;
+    const select = row.querySelector('#cpt-stream-mode');
+    if (select.value !== this.streamMode) select.value = this.streamMode;
+    row.className = `cpt-mode-row ${this.streamMode !== 'all' ? `cpt-mode-active cpt-cat-${this.streamMode}` : ''}`;
+    row.querySelector('#cpt-mode-note').textContent = this.streamMode === 'all'
+      ? 'Accepting everything'
+      : `${this.skippedCount} off-theme skipped`;
   }
 
   render() {
@@ -724,12 +1030,14 @@ class ChatProjectTracker {
     const counterEl = document.getElementById('cpt-counter');
     if (!listEl) return;
 
-    this.renderTagFilters();
+    this.renderCategoryFilters();
+    this.renderStreamMode();
     const filtered = this.getFilteredProjects();
 
     if (counterEl) {
       const total = this.projects.length;
-      counterEl.textContent = filtered.length === total ? `${total} Projects` : `${filtered.length} / ${total} Projects`;
+      const noun = total === 1 ? 'Item' : 'Items';
+      counterEl.textContent = filtered.length === total ? `${total} ${noun}` : `${filtered.length} / ${total} ${noun}`;
     }
 
     const container = document.getElementById(this.containerId);
@@ -748,13 +1056,13 @@ class ChatProjectTracker {
       listEl.innerHTML = this.projects.length === 0 ? `
         <div class="cpt-empty-state">
           <div class="cpt-empty-icon">💬</div>
-          <p>Nessun progetto rilevato nella chat.</p>
-          <small style="opacity: 0.7;">Scrivi in chat "!project [nome] - [descrizione]" oppure condividi un link GitHub!</small>
+          <p>Nothing captured from chat yet.</p>
+          <small style="opacity: 0.7;">Viewers can type !game, !project, !site, !art or !idea, or just share a Steam, GitHub, Etsy or website link.</small>
         </div>
       ` : `
         <div class="cpt-empty-state">
           <div class="cpt-empty-icon">🔎</div>
-          <p>No projects match the current search or filters.</p>
+          <p>No items match the current search or filters.</p>
         </div>
       `;
       return;
@@ -767,8 +1075,10 @@ class ChatProjectTracker {
       const url = this.safeUrl(p.url);
       const onAir = this.onAirId === p.id;
       const platform = CPT_PLATFORM_LABELS[p.platform];
+      const catKey = CPT_CATEGORIES[p.category] ? p.category : 'tech';
+      const cat = CPT_CATEGORIES[catKey];
       return `
-      <div class="cpt-card ${onAir ? 'cpt-on-air' : ''}" data-id="${esc(p.id)}">
+      <div class="cpt-card cpt-cat-${catKey} ${onAir ? 'cpt-on-air' : ''}" data-id="${esc(p.id)}">
         <div class="cpt-card-header">
           <h4 class="cpt-card-title">
             ${p.num ? `<span class="cpt-num" title="Viewers vote with !vote ${esc(p.num)}">#${esc(p.num)}</span>` : ''}
@@ -782,14 +1092,15 @@ class ChatProjectTracker {
           </div>
         </div>
         <div class="cpt-card-tags">
-          ${(p.tags || []).map(t => `<span class="cpt-mini-tag cpt-tag-${esc(t.toLowerCase())}">[${esc(t)}]</span>`).join('')}
+          <span class="cpt-cat-badge">${cat.icon} ${esc(cat.label)}</span>
+          ${(p.tags || []).map(t => `<button class="cpt-mini-tag cpt-tag-${esc(t.toLowerCase().replace(/[^a-z0-9]/g, ''))} ${this.tagFilter === t ? 'cpt-active' : ''}" data-action="tag" data-tag="${esc(t)}" title="Filter by ${esc(t)}">[${esc(t)}]</button>`).join('')}
         </div>
         <p class="cpt-card-desc">${esc(p.description)}</p>
         <div class="cpt-card-footer">
           <span class="cpt-card-author" style="color: ${this.safeColor(p.authorColor)}">@${esc(p.author)}${platform ? ` <span class="cpt-platform-badge cpt-platform-${esc(p.platform)}">${esc(platform)}</span>` : ''}</span>
           <div class="cpt-card-actions">
             ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="cpt-card-link">🔗 Link</a>` : ''}
-            <button class="cpt-btn cpt-btn-xs cpt-btn-stream ${onAir ? 'cpt-active' : ''}" data-action="show" data-id="${esc(p.id)}" title="${onAir ? 'Hide the on-stream overlay' : 'Show this project as a lower-third overlay'}">
+            <button class="cpt-btn cpt-btn-xs cpt-btn-stream ${onAir ? 'cpt-active' : ''}" data-action="show" data-id="${esc(p.id)}" title="${onAir ? 'Hide the on-stream overlay' : 'Show this item as a lower-third overlay'}">
               ${onAir ? '🔴 On Air' : '📺 Show on Stream'}
             </button>
             <button class="cpt-btn cpt-btn-xs" data-action="toggle" data-id="${esc(p.id)}">
