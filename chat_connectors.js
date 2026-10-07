@@ -6,6 +6,9 @@
  * Connectors open the live chat for a channel and push adapted messages to `onMessage`.
  */
 
+// Status messages are translated when i18n.js is loaded.
+const cptConnT = (key, params) => (typeof cptT === 'function' ? cptT(key, params) : key);
+
 const CPT_PLATFORMS = {
   twitch: { label: 'Twitch', color: '#9146ff' },
   kick: { label: 'Kick', color: '#53fc18' },
@@ -137,8 +140,8 @@ class BaseChatConnector {
     this.active = false;
   }
 
-  status(state, text) {
-    this.onStatus(state, text);
+  status(state, key, params = {}) {
+    this.onStatus(state, cptConnT(key, params), key, params);
   }
 
   emit(msg) {
@@ -153,10 +156,10 @@ class BaseChatConnector {
 class TwitchConnector extends BaseChatConnector {
   connect({ channel }) {
     const name = String(channel || '').trim().replace(/^#/, '').toLowerCase();
-    if (!name) return this.status('error', 'Enter a Twitch channel name');
+    if (!name) return this.status('error', 'conn.twitchEnter');
     this.disconnect();
     this.active = true;
-    this.status('connecting', `Connecting to twitch.tv/${name}...`);
+    this.status('connecting', 'conn.connecting', { target: `twitch.tv/${name}` });
 
     const socket = this.socket = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
     socket.onopen = () => {
@@ -168,12 +171,12 @@ class TwitchConnector extends BaseChatConnector {
     socket.onmessage = event => {
       String(event.data).split('\r\n').forEach(line => {
         if (line.startsWith('PING')) socket.send('PONG :tmi.twitch.tv');
-        else if (/ JOIN #/.test(line) || / 366 /.test(line)) this.status('connected', `Connected to twitch.tv/${name}`);
+        else if (/ JOIN #/.test(line) || / 366 /.test(line)) this.status('connected', 'conn.connected', { target: `twitch.tv/${name}` });
         else this.emit(TwitchAdapter.parseLine(line));
       });
     };
-    socket.onerror = () => this.status('error', `Error connecting to twitch.tv/${name}`);
-    socket.onclose = () => { if (this.socket === socket && this.active) this.status('offline', 'Disconnected from Twitch'); };
+    socket.onerror = () => this.status('error', 'conn.error', { target: `twitch.tv/${name}` });
+    socket.onclose = () => { if (this.socket === socket && this.active) this.status('offline', 'conn.disconnected', { platform: 'Twitch' }); };
   }
 
   disconnect() {
@@ -190,14 +193,14 @@ class KickConnector extends BaseChatConnector {
   /** `channel` is a Kick channel slug or a numeric chatroom id. */
   async connect({ channel }) {
     const value = String(channel || '').trim().replace(/^https?:\/\/(?:www\.)?kick\.com\//i, '').replace(/\/.*$/, '');
-    if (!value) return this.status('error', 'Enter a Kick channel name or chatroom ID');
+    if (!value) return this.status('error', 'conn.kickEnter');
     this.disconnect();
     this.active = true;
     const session = this.session = {};
 
     let chatroomId = /^\d+$/.test(value) ? value : '';
     if (!chatroomId) {
-      this.status('connecting', `Looking up kick.com/${value}...`);
+      this.status('connecting', 'conn.kickLookup', { name: value });
       try {
         const res = await fetch(`https://kick.com/api/v2/channels/${encodeURIComponent(value.toLowerCase())}`, { headers: { Accept: 'application/json' } });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -207,7 +210,7 @@ class KickConnector extends BaseChatConnector {
       } catch (e) {
         if (this.session === session) {
           this.active = false;
-          this.status('error', `Could not look up "${value}" (${e.message}). Kick may block browser lookups — enter the numeric chatroom ID instead.`);
+          this.status('error', 'conn.kickLookupFailed', { name: value, error: e.message });
         }
         return;
       }
@@ -215,7 +218,7 @@ class KickConnector extends BaseChatConnector {
     if (this.session !== session) return;
 
     const label = /^\d+$/.test(value) ? `Kick chatroom ${chatroomId}` : `kick.com/${value}`;
-    this.status('connecting', `Connecting to ${label}...`);
+    this.status('connecting', 'conn.connecting', { target: label });
     const socket = this.socket = new WebSocket(CPT_KICK_PUSHER_URL);
     socket.onmessage = event => {
       const frame = cptSafeJson(event.data);
@@ -223,17 +226,17 @@ class KickConnector extends BaseChatConnector {
       if (frame.event === 'pusher:connection_established') {
         socket.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${chatroomId}.v2` } }));
       } else if (frame.event === 'pusher_internal:subscription_succeeded') {
-        this.status('connected', `Connected to ${label}`);
+        this.status('connected', 'conn.connected', { target: label });
       } else if (frame.event === 'pusher:ping') {
         socket.send(JSON.stringify({ event: 'pusher:pong', data: {} }));
       } else if (frame.event === 'pusher:error') {
-        this.status('error', `Kick error: ${(cptSafeJson(frame.data) || {}).message || 'unknown'}`);
+        this.status('error', 'conn.kickError', { error: (cptSafeJson(frame.data) || {}).message || 'unknown' });
       } else {
         this.emit(KickAdapter.parse(frame));
       }
     };
-    socket.onerror = () => this.status('error', `Error connecting to ${label}`);
-    socket.onclose = () => { if (this.socket === socket && this.active) this.status('offline', 'Disconnected from Kick'); };
+    socket.onerror = () => this.status('error', 'conn.error', { target: label });
+    socket.onclose = () => { if (this.socket === socket && this.active) this.status('offline', 'conn.disconnected', { platform: 'Kick' }); };
   }
 
   disconnect() {
@@ -252,25 +255,25 @@ class YouTubeConnector extends BaseChatConnector {
   async connect({ video, apiKey }) {
     const videoId = YouTubeAdapter.parseVideoId(video);
     const key = String(apiKey || '').trim();
-    if (!videoId) return this.status('error', 'Enter a YouTube live video URL or ID');
-    if (!key) return this.status('error', 'A YouTube Data API v3 key is required');
+    if (!videoId) return this.status('error', 'conn.ytEnterVideo');
+    if (!key) return this.status('error', 'conn.ytKeyRequired');
     this.disconnect();
     this.active = true;
     const session = this.session = {};
-    this.status('connecting', `Finding live chat for video ${videoId}...`);
+    this.status('connecting', 'conn.ytFinding', { id: videoId });
 
     try {
       const info = await this.api(`videos?part=liveStreamingDetails&id=${encodeURIComponent(videoId)}`, key);
       const details = info.items && info.items[0] && info.items[0].liveStreamingDetails;
       const liveChatId = details && details.activeLiveChatId;
-      if (!liveChatId) throw new Error('this video has no active live chat');
+      if (!liveChatId) throw new Error(cptConnT('conn.ytNoChat'));
       if (this.session !== session) return;
-      this.status('connected', `Connected to YouTube live chat (${videoId})`);
+      this.status('connected', 'conn.ytConnected', { id: videoId });
       this.poll(session, liveChatId, key, null, true);
     } catch (e) {
       if (this.session === session) {
         this.active = false;
-        this.status('error', `YouTube: ${e.message}`);
+        this.status('error', 'conn.ytError', { error: e.message });
       }
     }
   }
@@ -296,7 +299,7 @@ class YouTubeConnector extends BaseChatConnector {
     } catch (e) {
       if (this.session === session) {
         this.active = false;
-        this.status('error', `YouTube: ${e.message}`);
+        this.status('error', 'conn.ytError', { error: e.message });
       }
     }
   }

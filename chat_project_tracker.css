@@ -997,3 +997,26 @@ button.cpt-mini-tag:hover,
 .cpt-cat-web { --cat-a: #60a5fa; --cat-b: #22d3ee; --cat-c: #6366f1; --cat-rgb: 96, 165, 250; }
 .cpt-cat-art { --cat-a: #f472b6; --cat-b: #fb923c; --cat-c: #facc15; --cat-rgb: 244, 114, 182; }
 .cpt-cat-idea { --cat-a: #facc15; --cat-b: #f97316; --cat-c: #fde68a; --cat-rgb: 250, 204, 21; }
+
+/* Language selector */
+.cpt-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cpt-lang-select {
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--cpt-text-main);
+  border: 1px solid var(--cpt-border);
+  border-radius: 6px;
+  padding: 3px 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cpt-lang-select option {
+  background: #111827;
+  color: #fff;
+}

@@ -13,6 +13,7 @@
   <h1>Connectors, upvotes &amp; overlay tests</h1>
   <div id="summary">running...</div>
   <pre id="results"></pre>
+  <script src="../i18n.js"></script>
   <script src="../chat_connectors.js"></script>
   <script src="../chat_project_tracker.js"></script>
   <script>
@@ -28,6 +29,8 @@
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     (async () => {
+      cptSetLanguage('en', { persist: false });
+
       // ---------- Twitch adapter ----------
       const tw = TwitchAdapter.parseLine('@badge-info=;color=#FF7F50;display-name=Night\\sOwl;id=abc-123;tmi-sent-ts=1700000000000 :nightowl!nightowl@nightowl.tmi.twitch.tv PRIVMSG #androbs :I built a tool: https://x.vercel.app');
       check('twitch: tags, escaped display-name, text', pick(tw, ['id', 'author', 'text', 'color', 'timestamp', 'platform', 'channel']),
@@ -170,6 +173,58 @@
       const p4 = new ChatProjectTracker({ containerId: '__none__', storageKey: key });
       check('legacy saved projects get a category', p4.projects.map(p => p.category), ['gaming', 'idea', 'tech']);
       localStorage.removeItem(key); localStorage.removeItem(key + '_meta');
+
+      // ---------- i18n ----------
+      const langs = Object.keys(CPT_LANGUAGES);
+      const enKeys = Object.keys(CPT_I18N.en);
+      const baseKey = k => k.replace(/\.(one|other)$/, '');
+      const placeholders = v => (v.match(/\{\w+\}/g) || []).sort().join(',');
+      check('languages offered', langs, ['it', 'es', 'en', 'ja']);
+      check('every language has every key', langs.map(l => [l, enKeys.filter(k => !(k in CPT_I18N[l]) && !(baseKey(k) in CPT_I18N[l]))]), langs.map(l => [l, []]));
+      check('no keys missing from English', langs.map(l => [l, Object.keys(CPT_I18N[l]).filter(k => !(k in CPT_I18N.en) && !enKeys.some(e => baseKey(e) === k))]), langs.map(l => [l, []]));
+      check('placeholders match English', langs.map(l => [l, Object.keys(CPT_I18N[l]).filter(k => {
+        const en = CPT_I18N.en[k] || CPT_I18N.en[`${k}.other`];
+        return placeholders(CPT_I18N[l][k]) !== placeholders(en);
+      })]), langs.map(l => [l, []]));
+      check('plurals, params and fallbacks', [cptT('count.items', { n: 1 }), cptT('count.items', { n: 3 }), cptT('count.items', { n: 3 }, 'ja'), cptT('count.items', { n: 1 }, 'it'), cptT('no.such.key')],
+        ['1 Item', '3 Items', '3 件', '1 elemento', 'no.such.key']);
+
+      const i18nRoot = document.createElement('div');
+      i18nRoot.id = '__i18n_root';
+      document.body.appendChild(i18nRoot);
+      const li = new ChatProjectTracker({ containerId: '__i18n_root', persist: false, overlayDuration: 300 });
+      li.processMessage({ id: 'j1', author: 'Yuki', text: '!game Celeste' });
+      li.setStreamMode('gaming');
+      const q = sel => i18nRoot.querySelector(sel);
+      const txt = sel => q(sel).textContent.replace(/\s+/g, ' ').trim();
+      cptSetLanguage('ja', { persist: false });
+      check('widget re-renders in Japanese', [txt('.cpt-title'), txt('#cpt-counter'), txt('[data-category="gaming"]'), txt('.cpt-btn-stream'), txt('#cpt-stream-mode option[value="gaming"]'), q('#cpt-stream-mode').value, q('#cpt-lang').value, document.documentElement.lang],
+        ['ライブショーケース＆コミュニティキュー', '1 件', '🎮 ゲーム 1', '📺 配信に表示', '今日は 🎮 ゲーム のみ', 'gaming', 'ja', 'ja']);
+      li.showOnStream('j1');
+      const ovj = document.querySelector('.cpt-overlay.cpt-overlay-in');
+      check('overlay labels follow the language', [ovj.querySelector('.cpt-overlay-live').textContent.trim(), ovj.querySelector('.cpt-overlay-cat').textContent.trim(), ovj.querySelector('.cpt-overlay-author').textContent.trim()],
+        ['おすすめゲーム', '🎮 ゲーム', '投稿：@Yuki']);
+      li.hideOverlay();
+      cptSetLanguage('it', { persist: false });
+      li.processMessage({ author: 'A', text: '!art Vaso in ceramica' });
+      check('Italian stream-mode note and counter', [txt('#cpt-mode-note'), txt('#cpt-counter'), txt('[data-action="clear-all"]')], ['Fuori tema scartati: 1', '1 elemento', '🗑 Svuota tutto']);
+      li.setSearch('games');
+      const foundEn = li.getFilteredProjects().length;
+      li.setSearch('ゲーム');
+      const foundJa = li.getFilteredProjects().length;
+      li.setSearch('celeste');
+      cptSetLanguage('ja', { persist: false });
+      check('category search works in any language; query survives a language switch', [foundEn, foundJa, q('#cpt-search').value, li.getFilteredProjects().length], [1, 1, 'celeste', 1]);
+      li.setSearch('');
+      cptSetLanguage('es');
+      li.toggleStatus('j1');
+      check('Spanish markdown + language saved', [li.toMarkdown(li.projects.filter(p => p.status === 'reviewed')), localStorage.getItem(CPT_LANGUAGE_KEY), cptDetectLanguage()],
+        ['- **Celeste** de @Yuki: Celeste', 'es', 'es']);
+      localStorage.removeItem(CPT_LANGUAGE_KEY);
+      cptSetLanguage('en', { persist: false });
+      check('back to English', txt('.cpt-title'), 'Live Showcase & Community Queue');
+      await sleep(800);
+      i18nRoot.remove();
 
       document.getElementById('results').innerHTML = lines
         .map(l => `<span class="${l.startsWith('PASS') ? 'pass' : 'fail'}">${l.replace(/</g, '&lt;')}</span>`).join('\n');

@@ -200,144 +200,144 @@
 <body>
 
   <div class="demo-header">
-    <h1>androbs Universal Live Showcase &amp; Community Queue</h1>
-    <p>Games, tech, websites, handmade art and stream topics from Twitch, Kick &amp; YouTube chat: auto-categorized, voted on, and shown on stream</p>
+    <h1 data-i18n="page.title">androbs Universal Live Showcase &amp; Community Queue</h1>
+    <p data-i18n="page.subtitle">Games, tech, websites, handmade art and stream topics from Twitch, Kick &amp; YouTube chat: auto-categorized, voted on, and shown on stream</p>
   </div>
 
   <div class="layout-grid">
-    <!-- Left column: Chat Simulation & Live Twitch connection -->
+    <!-- Left column: Chat Simulation & live chat connection -->
     <div class="chat-sim-card">
-      <h2>🎮 Chat Simulator & Test Controls</h2>
-      <p style="color: #9ca3af; font-size: 13px; margin: 0;">Click to simulate viewers proposing ideas or testing edge cases:</p>
+      <h2 data-i18n="sim.heading">🎮 Chat Simulator & Test Controls</h2>
+      <p style="color: #9ca3af; font-size: 13px; margin: 0;" data-i18n="sim.intro">Click to simulate viewers proposing ideas or testing edge cases:</p>
 
       <div class="sim-buttons">
         <button class="sim-btn" onclick="sendSimMsg('AlexDev', '!project SuperAI - Autonomous agent for Discord moderation', '#60a5fa')">
           <span>💬 <b>!project</b> SuperAI - Autonomous agent</span>
-          <span class="badge">Triggers extractor</span>
+          <span class="badge" data-i18n="badge.triggers">Triggers extractor</span>
         </button>
 
         <button class="sim-btn" onclick="sendSimMsg('SofiaCode', 'Hey streamer! Check out my open-source project: https://github.com/sofia/voice-transcriber-app', '#f472b6')">
-          <span>💬 Natural language + GitHub link</span>
-          <span class="badge">Triggers extractor</span>
+          <span>💬 <span data-i18n="sim.nl">Natural language + GitHub link</span></span>
+          <span class="badge" data-i18n="badge.triggers">Triggers extractor</span>
         </button>
 
         <button class="sim-btn" onclick="sendSimMsg('Carlos_VE', '¡Hola! He creado una app para calcular estadísticas de la NBA: https://nbastats.vercel.app', '#34d399')">
-          <span>💬 Spanish language proposal</span>
-          <span class="badge">Triggers extractor</span>
+          <span>💬 <span data-i18n="sim.spanish">Spanish language proposal</span></span>
+          <span class="badge" data-i18n="badge.triggers">Triggers extractor</span>
         </button>
 
         <button class="sim-btn" onclick="sendSimMsg('MarcoIT', 'Un\'idea per te: potresti fare un bot che riassume la chat ogni 10 minuti!', '#fbbf24')">
-          <span>💬 Italian idea suggestion</span>
-          <span class="badge">Triggers extractor</span>
+          <span>💬 <span data-i18n="sim.italianIdea">Italian idea suggestion</span></span>
+          <span class="badge" data-i18n="badge.triggers">Triggers extractor</span>
         </button>
 
         <button class="sim-btn" onclick="sendSimMsg('Gamer99', 'GG streamer! Great play, keep it up!', '#9ca3af')">
-          <span>💬 Normal chit-chat (Ignored)</span>
-          <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">No trigger</span>
+          <span>💬 <span data-i18n="sim.chitchat">Normal chit-chat (Ignored)</span></span>
+          <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;" data-i18n="badge.noTrigger">No trigger</span>
         </button>
       </div>
 
-      <p class="sim-section-label">Universal categories (pick a Stream Mode in the widget to test filtering):</p>
+      <p class="sim-section-label" data-i18n="sim.catLabel">Universal categories (pick a Stream Mode in the widget to test filtering):</p>
       <div class="sim-buttons">
         <button class="sim-btn" onclick="simSteamSuggestion()">
-          <span>🎮 <b>Steam</b> game suggestion (Twitch)</span>
-          <span class="badge badge-gaming">Gaming</span>
+          <span>🎮 <b>Steam</b> <span data-i18n="sim.steam">game suggestion (Twitch)</span></span>
+          <span class="badge badge-gaming" data-i18n="cat.gaming.name">Gaming</span>
         </button>
 
         <button class="sim-btn" onclick="simEtsyCraft()">
-          <span>🎨 <b>Etsy</b> handmade crochet showcase (Kick, Spanish)</span>
-          <span class="badge badge-art">Handmade &amp; Art</span>
+          <span>🎨 <b>Etsy</b> <span data-i18n="sim.etsy">handmade crochet showcase (Kick, Spanish)</span></span>
+          <span class="badge badge-art" data-i18n="cat.art.name">Handmade &amp; Art</span>
         </button>
 
         <button class="sim-btn" onclick="simInstagramArt()">
-          <span>🎨 <b>Instagram</b> watercolor portrait (YouTube, Italian)</span>
-          <span class="badge badge-art">Handmade &amp; Art</span>
+          <span>🎨 <b>Instagram</b> <span data-i18n="sim.instagram">watercolor portrait (YouTube, Italian)</span></span>
+          <span class="badge badge-art" data-i18n="cat.art.name">Handmade &amp; Art</span>
         </button>
 
         <button class="sim-btn" onclick="simWebsiteReview()">
-          <span>🌐 Website review request (YouTube)</span>
-          <span class="badge badge-web">Websites</span>
+          <span>🌐 <span data-i18n="sim.website">Website review request (YouTube)</span></span>
+          <span class="badge badge-web" data-i18n="cat.web.label">Websites</span>
         </button>
 
         <button class="sim-btn" onclick="simStreamTopic()">
-          <span>💡 General stream topic (Twitch)</span>
-          <span class="badge badge-idea">Ideas &amp; Topics</span>
+          <span>💡 <span data-i18n="sim.topic">General stream topic (Twitch)</span></span>
+          <span class="badge badge-idea" data-i18n="cat.idea.name">Ideas &amp; Topics</span>
         </button>
 
         <button class="sim-btn" onclick="sendSimMsg('IndieRaul', '!game Balatro - poker roguelike, perfecto para el stream', '#22d3ee')">
           <span>💬 <b>!game</b> Balatro</span>
-          <span class="badge badge-gaming">Gaming</span>
+          <span class="badge badge-gaming" data-i18n="cat.gaming.name">Gaming</span>
         </button>
 
         <button class="sim-btn" onclick="sendSimMsg('ClayCrafts', '!art Ceramic Dragon Mug - hand-painted and fired this weekend', '#fb923c')">
           <span>💬 <b>!art</b> Ceramic Dragon Mug</span>
-          <span class="badge badge-art">Handmade &amp; Art</span>
+          <span class="badge badge-art" data-i18n="cat.art.name">Handmade &amp; Art</span>
         </button>
       </div>
 
-      <p class="sim-section-label">Multi-platform payloads & community upvotes:</p>
+      <p class="sim-section-label" data-i18n="sim.multiLabel">Multi-platform payloads & community upvotes:</p>
       <div class="sim-buttons">
         <button class="sim-btn" onclick="simKickMessage()">
-          <span>🟢 <b>Kick</b> chat event (Spanish repo share)</span>
-          <span class="badge badge-kick">Kick adapter</span>
+          <span>🟢 <b>Kick</b> <span data-i18n="sim.kick">chat event (Spanish repo share)</span></span>
+          <span class="badge badge-kick" data-i18n="badge.adapter" data-i18n-args='{"platform":"Kick"}'>Kick adapter</span>
         </button>
 
         <button class="sim-btn" onclick="simYouTubeMessage()">
-          <span>🔴 <b>YouTube</b> liveChatMessage (Italian)</span>
-          <span class="badge badge-youtube">YouTube adapter</span>
+          <span>🔴 <b>YouTube</b> liveChatMessage <span data-i18n="sim.italian">(Italian)</span></span>
+          <span class="badge badge-youtube" data-i18n="badge.adapter" data-i18n-args='{"platform":"YouTube"}'>YouTube adapter</span>
         </button>
 
         <button class="sim-btn" onclick="simTwitchIrc()">
-          <span>🟣 <b>Twitch</b> raw IRC PRIVMSG</span>
-          <span class="badge badge-twitch">Twitch adapter</span>
+          <span>🟣 <b>Twitch</b> <span data-i18n="sim.twitchIrc">raw IRC PRIVMSG</span></span>
+          <span class="badge badge-twitch" data-i18n="badge.adapter" data-i18n-args='{"platform":"Twitch"}'>Twitch adapter</span>
         </button>
 
         <button class="sim-btn" onclick="simTwitchVote('!vote 1')">
-          <span>▲ <b>!vote 1</b> from a new Twitch viewer</span>
-          <span class="badge badge-vote">Upvote #1</span>
+          <span>▲ <b>!vote 1</b> <span data-i18n="sim.voteFrom" data-i18n-args='{"platform":"Twitch"}'>from a new Twitch viewer</span></span>
+          <span class="badge badge-vote" data-i18n="badge.upvote" data-i18n-args='{"n":1}'>Upvote #1</span>
         </button>
 
         <button class="sim-btn" onclick="simKickVote('!upvote 2')">
-          <span>▲ <b>!upvote 2</b> from a new Kick viewer</span>
-          <span class="badge badge-vote">Upvote #2</span>
+          <span>▲ <b>!upvote 2</b> <span data-i18n="sim.voteFrom" data-i18n-args='{"platform":"Kick"}'>from a new Kick viewer</span></span>
+          <span class="badge badge-vote" data-i18n="badge.upvote" data-i18n-args='{"n":2}'>Upvote #2</span>
         </button>
 
         <button class="sim-btn" onclick="simYouTubeVote('+1')">
-          <span>▲ <b>+1</b> from a new YouTube viewer</span>
-          <span class="badge badge-vote">On-stream / newest</span>
+          <span>▲ <b>+1</b> <span data-i18n="sim.voteFrom" data-i18n-args='{"platform":"YouTube"}'>from a new YouTube viewer</span></span>
+          <span class="badge badge-vote" data-i18n="badge.plusOne">On-stream / newest</span>
         </button>
       </div>
 
       <div class="custom-msg-wrap">
-        <input type="text" id="custom-text" class="custom-input" placeholder="Type a message to simulate (e.g. !project MyTool)..." onkeydown="if(event.key==='Enter') sendCustomMsg()">
-        <button class="sim-btn" style="background: #7928ca; border: none; padding: 10px 18px;" onclick="sendCustomMsg()">Send</button>
+        <input type="text" id="custom-text" class="custom-input" placeholder="Type a message to simulate (e.g. !project MyTool)..." data-i18n-placeholder="custom.placeholder" onkeydown="if(event.key==='Enter') sendCustomMsg()">
+        <button class="sim-btn" style="background: #7928ca; border: none; padding: 10px 18px;" onclick="sendCustomMsg()" data-i18n="custom.send">Send</button>
       </div>
 
       <!-- Live chat connection: Twitch / Kick / YouTube -->
       <div class="connect-box">
-        <h3 style="margin: 0; font-size: 14px;">Connect Live Chat:</h3>
-        <div class="platform-tabs" role="tablist" aria-label="Chat platform">
+        <h3 style="margin: 0; font-size: 14px;" data-i18n="connect.heading">Connect Live Chat:</h3>
+        <div class="platform-tabs" role="tablist" aria-label="Chat platform" data-i18n-aria-label="connect.platformAria">
           <button class="platform-tab" role="tab" data-platform="twitch" style="--tab-color: #9146ff;" aria-selected="true">Twitch</button>
           <button class="platform-tab" role="tab" data-platform="kick" style="--tab-color: #53fc18;" aria-selected="false">Kick</button>
           <button class="platform-tab" role="tab" data-platform="youtube" style="--tab-color: #ff0033;" aria-selected="false">YouTube</button>
         </div>
 
         <div class="platform-panel" role="tabpanel" data-platform="twitch">
-          <input type="text" id="twitch-channel" class="custom-input" placeholder="Channel name (e.g. ibai, erismoh)...">
+          <input type="text" id="twitch-channel" class="custom-input" placeholder="Channel name (e.g. ibai, erismoh)..." data-i18n-placeholder="connect.twitchPh">
         </div>
         <div class="platform-panel" role="tabpanel" data-platform="kick" hidden>
-          <input type="text" id="kick-channel" class="custom-input" placeholder="Channel name or chatroom ID (e.g. xqc or 668)...">
-          <p class="platform-hint">If Kick blocks the channel lookup, enter the numeric chatroom ID instead.</p>
+          <input type="text" id="kick-channel" class="custom-input" placeholder="Channel name or chatroom ID (e.g. xqc or 668)..." data-i18n-placeholder="connect.kickPh">
+          <p class="platform-hint" data-i18n="connect.kickHint">If Kick blocks the channel lookup, enter the numeric chatroom ID instead.</p>
         </div>
         <div class="platform-panel" role="tabpanel" data-platform="youtube" hidden>
-          <input type="text" id="youtube-video" class="custom-input" placeholder="Live video URL or ID (e.g. youtube.com/watch?v=...)">
-          <input type="password" id="youtube-key" class="custom-input" placeholder="YouTube Data API v3 key" autocomplete="off">
-          <p class="platform-hint">The API key is only kept in memory for this tab and is never saved.</p>
+          <input type="text" id="youtube-video" class="custom-input" placeholder="Live video URL or ID (e.g. youtube.com/watch?v=...)" data-i18n-placeholder="connect.ytVideoPh">
+          <input type="password" id="youtube-key" class="custom-input" placeholder="YouTube Data API v3 key" data-i18n-placeholder="connect.ytKeyPh" autocomplete="off">
+          <p class="platform-hint" data-i18n="connect.ytHint">The API key is only kept in memory for this tab and is never saved.</p>
         </div>
 
         <div class="connect-row">
-          <button class="sim-btn" id="connect-btn" style="flex: 1; background: #9146ff; border: none;" onclick="connectLiveChat()">Connect</button>
-          <button class="sim-btn" id="disconnect-btn" onclick="disconnectLiveChat()">Disconnect</button>
+          <button class="sim-btn" id="connect-btn" style="flex: 1; background: #9146ff; border: none;" onclick="connectLiveChat()">Connect Twitch</button>
+          <button class="sim-btn" id="disconnect-btn" onclick="disconnectLiveChat()" data-i18n="connect.disconnect">Disconnect</button>
         </div>
         <div id="connect-status" class="status-pill">Offline</div>
       </div>
@@ -347,6 +347,7 @@
     <div id="chat-project-tracker-root"></div>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="chat_connectors.js"></script>
   <script src="chat_project_tracker.js"></script>
   <script>
@@ -483,9 +484,13 @@
     let activePlatform = 'twitch';
     let connector = null;
 
-    function setStatus(state, text) {
+    let lastStatus = { state: 'offline', key: 'conn.offline', params: {} };
+
+    // Connectors pass the translation key too, so the status can be re-translated on language change.
+    function setStatus(state, text, key, params = {}) {
+      lastStatus = { state, text, key, params };
       const el = document.getElementById('connect-status');
-      el.textContent = text;
+      el.textContent = key ? cptT(key, params) : text;
       el.style.color = { connecting: '#fbbf24', connected: '#34d399', error: '#ef4444' }[state] || '#9ca3af';
     }
 
@@ -497,7 +502,7 @@
         const btn = document.getElementById('connect-btn');
         btn.style.background = CPT_PLATFORMS[activePlatform].color;
         btn.style.color = activePlatform === 'kick' ? '#0b0e14' : '#fff';
-        btn.textContent = `Connect ${CPT_PLATFORMS[activePlatform].label}`;
+        updateConnectButton();
       });
     });
 
@@ -519,7 +524,7 @@
     function disconnectLiveChat() {
       if (connector) connector.disconnect();
       connector = null;
-      setStatus('offline', 'Offline');
+      setStatus('offline', null, 'conn.offline');
     }
 
     ['twitch-channel', 'kick-channel', 'youtube-video', 'youtube-key'].forEach(id => {
@@ -531,6 +536,21 @@
       document.querySelector('.platform-tab[data-platform="twitch"]').click();
       connectLiveChat();
     }
+
+    // ---------- Language ----------
+    function updateConnectButton() {
+      document.getElementById('connect-btn').textContent = cptT('connect.button', { platform: CPT_PLATFORMS[activePlatform].label });
+    }
+
+    function applyPageLanguage() {
+      document.title = cptT('page.docTitle');
+      cptApplyI18n();
+      updateConnectButton();
+      setStatus(lastStatus.state, lastStatus.text, lastStatus.key, lastStatus.params);
+    }
+
+    window.addEventListener('cpt:languagechange', applyPageLanguage);
+    applyPageLanguage();
   </script>
 </body>
 </html>

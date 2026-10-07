@@ -1,17 +1,24 @@
 /**
  * chat_project_tracker.js - androbs Universal Live Showcase & Community Queue
  * Detects, categorizes, and organizes games, tech projects, websites, handmade art and stream topics shared in live chat.
+ * Requires i18n.js (UI translations) to be loaded first.
  */
 
 const CPT_TAG_ORDER = ['GitHub', 'GitLab', 'Vercel', 'Netlify', 'Steam', 'itch.io', 'Etsy', 'Instagram', 'Web', 'App', 'Idea', 'Project'];
 
 const CPT_CATEGORIES = {
-  gaming: { label: 'Games', name: 'Gaming', icon: '🎮', overlay: 'Game Suggestion', link: '🕹️' },
-  tech: { label: 'Tech', name: 'Tech & Code', icon: '💻', overlay: 'Tech & Code', link: '🔗' },
-  web: { label: 'Websites', name: 'Websites & Portals', icon: '🌐', overlay: 'Website Review', link: '🌐' },
-  art: { label: 'Handmade & Art', name: 'Handmade & Art', icon: '🎨', overlay: 'Handmade & Art', link: '🛍️' },
-  idea: { label: 'Ideas', name: 'Ideas & Topics', icon: '💡', overlay: 'Stream Topic', link: '🔗' }
+  gaming: { icon: '🎮', link: '🕹️' },
+  tech: { icon: '💻', link: '🔗' },
+  web: { icon: '🌐', link: '🌐' },
+  art: { icon: '🎨', link: '🛍️' },
+  idea: { icon: '💡', link: '🔗' }
 };
+// label (chips), name (badges) and overlay (eyebrow) follow the current UI language.
+Object.entries(CPT_CATEGORIES).forEach(([key, cat]) => {
+  ['label', 'name', 'overlay'].forEach(field => {
+    Object.defineProperty(cat, field, { enumerable: true, get: () => cptT(`cat.${key}.${field}`) });
+  });
+});
 const CPT_CATEGORY_ORDER = Object.keys(CPT_CATEGORIES);
 
 // Explicit chat commands -> category. Lookup is accent-insensitive ("!artesanía" == "!artesania").
@@ -285,6 +292,13 @@ class ChatProjectTracker {
     this.onAirId = null;
     this.bumpId = null;
     this.projects = this.loadProjects();
+    if (options.language) cptSetLanguage(options.language, { persist: false });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('cpt:languagechange', () => {
+        const el = document.getElementById(this.containerId);
+        if (el && el.__cptTracker === this) this.initUI();
+      });
+    }
 
     this.initUI();
   }
@@ -361,7 +375,7 @@ class ChatProjectTracker {
     };
     project.category = this.detectCategory(project, { kind, forced, norm });
     if (!project.title) {
-      project.title = (project.category === 'web' && host) || this.titleFromText(text, kind) || 'New Item';
+      project.title = (project.category === 'web' && host) || this.titleFromText(text, kind) || cptT('item.untitled');
     }
     project.tags = this.detectTags(project, { kind, command, norm, category: project.category });
     return project;
@@ -615,7 +629,7 @@ class ChatProjectTracker {
     this.saveProjects();
     this.render();
     const cat = CPT_CATEGORIES[this.streamMode];
-    this.showToast(cat ? `Stream Mode: only ${cat.icon} ${cat.label} today` : 'Stream Mode: accepting all categories');
+    this.showToast(cat ? cptT('toast.modeOn', { icon: cat.icon, label: cat.label }) : cptT('toast.modeAll'));
   }
 
   setCategoryFilter(category) {
@@ -639,6 +653,9 @@ class ChatProjectTracker {
     const catKey = CPT_CATEGORIES[p.category] ? p.category : 'tech';
     const cat = CPT_CATEGORIES[catKey];
 
+    const [byBefore, byAfter = ''] = cptT('overlay.by', { author: '\u0000' }).split('\u0000');
+    const byHtml = `${esc(byBefore)}<span style="color: ${this.safeColor(p.authorColor)}">@${esc(p.author)}</span>${esc(byAfter)}`;
+
     const el = document.createElement('div');
     el.className = `cpt-overlay cpt-cat-${catKey}`;
     el.setAttribute('role', 'status');
@@ -656,11 +673,11 @@ class ChatProjectTracker {
           <span class="cpt-overlay-chip cpt-overlay-votes">▲ ${esc(p.votes || 0)}</span>
         </div>
         <div class="cpt-overlay-title">${esc(p.title)}</div>
-        <div class="cpt-overlay-author">by <span style="color: ${this.safeColor(p.authorColor)}">@${esc(p.author)}</span></div>
+        <div class="cpt-overlay-author">${byHtml}</div>
         ${desc ? `<div class="cpt-overlay-desc">${esc(desc)}</div>` : ''}
         ${url ? `<a class="cpt-overlay-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${cat.link} ${esc(linkLabel)}</a>` : ''}
       </div>
-      <button class="cpt-overlay-close" type="button" aria-label="Hide overlay">✕</button>
+      <button class="cpt-overlay-close" type="button" aria-label="${esc(cptT('overlay.hide'))}">✕</button>
       <div class="cpt-overlay-progress"></div>
     `;
     el.querySelector('.cpt-overlay-close').addEventListener('click', () => this.hideOverlay());
@@ -717,14 +734,14 @@ class ChatProjectTracker {
   clearAll(skipConfirm = false) {
     if (this.projects.length === 0) return false;
     if (!skipConfirm && typeof window !== 'undefined' && typeof window.confirm === 'function') {
-      if (!window.confirm(`Delete all ${this.projects.length} captured items? This cannot be undone.`)) return false;
+      if (!window.confirm(cptT('confirm.clearAll', { n: this.projects.length }))) return false;
     }
     this.hideOverlay();
     this.projects = [];
     this.seq = 0;
     this.saveProjects();
     this.render();
-    this.showToast('All items cleared');
+    this.showToast(cptT('toast.cleared'));
     return true;
   }
 
@@ -813,24 +830,24 @@ class ChatProjectTracker {
     const clean = s => String(s || '').replace(/\s+/g, ' ').trim();
     const escText = s => clean(s).replace(/([\\[\]*_`])/g, '\\$1');
     return projects.map(p => {
-      const title = escText(p.title) || 'Untitled';
+      const title = escText(p.title) || cptT('md.untitled');
       const safeUrl = this.safeUrl(p.url);
       const head = safeUrl ? `[${title}](${safeUrl.replace(/\(/g, '%28').replace(/\)/g, '%29')})` : `**${title}**`;
       const desc = clean(String(p.description || '').split(p.url || '\u0000').join(' ')).replace(/[\s:,-]+$/, '');
-      return `- ${head} by @${clean(p.author)}${desc ? `: ${desc}` : ''}`;
+      return `- ${cptT('md.item', { head, author: clean(p.author) })}${desc ? `: ${desc}` : ''}`;
     }).join('\n');
   }
 
   async copyMarkdown() {
     const reviewed = this.projects.filter(p => p.status === 'reviewed');
     if (reviewed.length === 0) {
-      this.showToast('No reviewed items to copy yet', 'warn');
+      this.showToast(cptT('toast.noReviewed'), 'warn');
       return false;
     }
     const md = this.toMarkdown(reviewed);
     const ok = await this.copyToClipboard(md);
     this.showToast(
-      ok ? `Copied ${reviewed.length} reviewed item${reviewed.length === 1 ? '' : 's'} as Markdown` : 'Could not access the clipboard',
+      ok ? cptT('toast.copied', { n: reviewed.length }) : cptT('toast.clipboardError'),
       ok ? 'success' : 'error'
     );
     return ok;
@@ -904,8 +921,8 @@ class ChatProjectTracker {
       if (this.categoryFilter && p.category !== this.categoryFilter) return false;
       if (this.tagFilter && !(p.tags || []).includes(this.tagFilter)) return false;
       if (terms.length) {
-        const cat = CPT_CATEGORIES[p.category] || {};
-        const haystack = cptNormalize([p.title, p.author, p.description, p.url, (p.tags || []).join(' '), cat.name, cat.label].join(' '));
+        const catWords = CPT_CATEGORIES[p.category] ? [...cptTAll(`cat.${p.category}.name`), ...cptTAll(`cat.${p.category}.label`)] : [];
+        const haystack = cptNormalize([p.title, p.author, p.description, p.url, (p.tags || []).join(' '), ...catWords].join(' '));
         return terms.every(t => haystack.includes(t));
       }
       return true;
@@ -917,6 +934,9 @@ class ChatProjectTracker {
     const container = document.getElementById(this.containerId);
     if (!container) return;
 
+    const esc = v => this.escapeHtml(v);
+    const t = (key, params) => esc(cptT(key, params));
+    container.__cptTracker = this;
     container.innerHTML = `
       <div class="cpt-container">
         <div class="cpt-header">
@@ -924,57 +944,63 @@ class ChatProjectTracker {
             <div class="cpt-title-wrap">
               <div class="cpt-icon">✨</div>
               <div>
-                <h3 class="cpt-title">Live Showcase &amp; Community Queue</h3>
-                <p class="cpt-subtitle">Games, tech, sites, art &amp; topics from chat</p>
+                <h3 class="cpt-title">${t('app.title')}</h3>
+                <p class="cpt-subtitle">${t('app.subtitle')}</p>
               </div>
             </div>
-            <span class="cpt-badge-count" id="cpt-counter">0 Items</span>
+            <div class="cpt-header-meta">
+              <span class="cpt-badge-count" id="cpt-counter"></span>
+              <select class="cpt-lang-select" id="cpt-lang" aria-label="${t('lang.label')}" title="${t('lang.label')}">
+                ${Object.keys(CPT_LANGUAGES).map(code => `<option value="${code}" title="${esc(CPT_LANGUAGES[code].label)}" ${code === cptGetLanguage() ? 'selected' : ''}>${CPT_LANGUAGES[code].flag} ${code.toUpperCase()}</option>`).join('')}
+              </select>
+            </div>
           </div>
           <div class="cpt-search-row">
             <div class="cpt-search-wrap">
               <span class="cpt-search-icon">🔍</span>
-              <input type="search" class="cpt-search" id="cpt-search" placeholder="Search title, author, category..." autocomplete="off" aria-label="Search items">
+              <input type="search" class="cpt-search" id="cpt-search" placeholder="${t('search.placeholder')}" autocomplete="off" aria-label="${t('search.aria')}">
             </div>
-            <div class="cpt-sort-toggle" role="group" aria-label="Sort projects">
-              <button class="cpt-sort-btn" data-action="sort" data-sort="newest" title="Sort by Newest">🕒 Newest</button>
-              <button class="cpt-sort-btn" data-action="sort" data-sort="votes" title="Sort by Most Upvoted">▲ Most Upvoted</button>
+            <div class="cpt-sort-toggle" role="group" aria-label="${t('sort.aria')}">
+              <button class="cpt-sort-btn" data-action="sort" data-sort="newest" title="${t('sort.newestTitle')}">${t('sort.newest')}</button>
+              <button class="cpt-sort-btn" data-action="sort" data-sort="votes" title="${t('sort.votesTitle')}">${t('sort.votes')}</button>
             </div>
           </div>
-          <div class="cpt-tag-filters cpt-cat-filters" id="cpt-cat-filters" aria-label="Filter by category"></div>
+          <div class="cpt-tag-filters cpt-cat-filters" id="cpt-cat-filters" aria-label="${t('cat.filterAria')}"></div>
           <div class="cpt-mode-row" id="cpt-mode-row">
-            <label class="cpt-mode-label" for="cpt-stream-mode">🎯 Stream Mode</label>
+            <label class="cpt-mode-label" for="cpt-stream-mode">${t('mode.label')}</label>
             <select class="cpt-mode-select" id="cpt-stream-mode">
-              <option value="all">🌈 All categories</option>
-              ${CPT_CATEGORY_ORDER.map(c => `<option value="${c}">Only ${CPT_CATEGORIES[c].icon} ${this.escapeHtml(CPT_CATEGORIES[c].label)} today</option>`).join('')}
+              <option value="all">${t('mode.all')}</option>
+              ${CPT_CATEGORY_ORDER.map(c => `<option value="${c}">${t('mode.only', { icon: CPT_CATEGORIES[c].icon, label: CPT_CATEGORIES[c].label })}</option>`).join('')}
             </select>
             <span class="cpt-mode-note" id="cpt-mode-note"></span>
           </div>
         </div>
 
         <div class="cpt-actions">
-          <button class="cpt-btn cpt-btn-primary" data-action="export-json">📥 Export JSON</button>
-          <button class="cpt-btn cpt-btn-primary" data-action="copy-md">📋 Copy Markdown</button>
+          <button class="cpt-btn cpt-btn-primary" data-action="export-json">${t('action.exportJson')}</button>
+          <button class="cpt-btn cpt-btn-primary" data-action="copy-md">${t('action.copyMd')}</button>
           <div class="cpt-filter-group">
-            <button class="cpt-btn cpt-filter-btn" data-action="filter" data-filter="all">All</button>
-            <button class="cpt-btn cpt-filter-btn" data-action="filter" data-filter="new">New</button>
-            <button class="cpt-btn cpt-filter-btn" data-action="filter" data-filter="reviewed">Reviewed</button>
+            <button class="cpt-btn cpt-filter-btn" data-action="filter" data-filter="all">${t('filter.all')}</button>
+            <button class="cpt-btn cpt-filter-btn" data-action="filter" data-filter="new">${t('filter.new')}</button>
+            <button class="cpt-btn cpt-filter-btn" data-action="filter" data-filter="reviewed">${t('filter.reviewed')}</button>
           </div>
-          <button class="cpt-btn cpt-btn-danger" data-action="clear-all" title="Delete all captured items">🗑 Clear All</button>
+          <button class="cpt-btn cpt-btn-danger" data-action="clear-all" title="${t('action.clearAllTitle')}">${t('action.clearAll')}</button>
         </div>
 
-        <div class="cpt-list" id="cpt-list-items">
-          <!-- Items will render here -->
-        </div>
+        <div class="cpt-list" id="cpt-list-items"></div>
       </div>
     `;
 
     const searchEl = container.querySelector('#cpt-search');
+    searchEl.value = this.searchQuery;
     searchEl.addEventListener('input', e => this.setSearch(e.target.value));
+    container.querySelector('#cpt-lang').addEventListener('change', e => cptSetLanguage(e.target.value));
     container.querySelector('#cpt-stream-mode').addEventListener('change', e => this.setStreamMode(e.target.value));
 
-    container.addEventListener('click', e => {
+    const root = container.querySelector('.cpt-container');
+    root.addEventListener('click', e => {
       const btn = e.target.closest('[data-action]');
-      if (!btn || !container.contains(btn)) return;
+      if (!btn || !root.contains(btn)) return;
       const { action, id, filter, tag, sort, category } = btn.dataset;
       switch (action) {
         case 'export-json': this.exportJSON(); break;
@@ -1007,9 +1033,9 @@ class ChatProjectTracker {
       <button class="cpt-tag-chip cpt-cat-chip ${key ? `cpt-cat-${key}` : ''} ${active ? 'cpt-active' : ''} ${count ? '' : 'cpt-empty'}"
         data-action="category" data-category="${key}" aria-pressed="${active}">${label} <span class="cpt-chip-count">${count}</span></button>`;
     };
-    el.innerHTML = chip('', 'All', this.projects.length) +
+    el.innerHTML = chip('', esc(cptT('filter.all')), this.projects.length) +
       CPT_CATEGORY_ORDER.map(c => chip(c, `${CPT_CATEGORIES[c].icon} ${esc(CPT_CATEGORIES[c].label)}`, counts[c] || 0)).join('') +
-      (this.tagFilter ? `<button class="cpt-tag-chip cpt-tag-pill cpt-active" data-action="tag" data-tag="${esc(this.tagFilter)}" title="Clear tag filter">🏷 ${esc(this.tagFilter)} ✕</button>` : '');
+      (this.tagFilter ? `<button class="cpt-tag-chip cpt-tag-pill cpt-active" data-action="tag" data-tag="${esc(this.tagFilter)}" title="${esc(cptT('tag.clear'))}">🏷 ${esc(this.tagFilter)} ✕</button>` : '');
   }
 
   renderStreamMode() {
@@ -1020,8 +1046,8 @@ class ChatProjectTracker {
     if (select.value !== this.streamMode) select.value = this.streamMode;
     row.className = `cpt-mode-row ${this.streamMode !== 'all' ? `cpt-mode-active cpt-cat-${this.streamMode}` : ''}`;
     row.querySelector('#cpt-mode-note').textContent = this.streamMode === 'all'
-      ? 'Accepting everything'
-      : `${this.skippedCount} off-theme skipped`;
+      ? cptT('mode.noteAll')
+      : cptT('mode.skipped', { n: this.skippedCount });
   }
 
   render() {
@@ -1036,8 +1062,9 @@ class ChatProjectTracker {
 
     if (counterEl) {
       const total = this.projects.length;
-      const noun = total === 1 ? 'Item' : 'Items';
-      counterEl.textContent = filtered.length === total ? `${total} ${noun}` : `${filtered.length} / ${total} ${noun}`;
+      counterEl.textContent = filtered.length === total
+        ? cptT('count.items', { n: total })
+        : cptT('count.filtered', { n: total, shown: filtered.length });
     }
 
     const container = document.getElementById(this.containerId);
@@ -1056,13 +1083,13 @@ class ChatProjectTracker {
       listEl.innerHTML = this.projects.length === 0 ? `
         <div class="cpt-empty-state">
           <div class="cpt-empty-icon">💬</div>
-          <p>Nothing captured from chat yet.</p>
-          <small style="opacity: 0.7;">Viewers can type !game, !project, !site, !art or !idea, or just share a Steam, GitHub, Etsy or website link.</small>
+          <p>${this.escapeHtml(cptT('empty.none'))}</p>
+          <small style="opacity: 0.7;">${this.escapeHtml(cptT('empty.hint'))}</small>
         </div>
       ` : `
         <div class="cpt-empty-state">
           <div class="cpt-empty-icon">🔎</div>
-          <p>No items match the current search or filters.</p>
+          <p>${this.escapeHtml(cptT('empty.noMatch'))}</p>
         </div>
       `;
       return;
@@ -1081,32 +1108,32 @@ class ChatProjectTracker {
       <div class="cpt-card cpt-cat-${catKey} ${onAir ? 'cpt-on-air' : ''}" data-id="${esc(p.id)}">
         <div class="cpt-card-header">
           <h4 class="cpt-card-title">
-            ${p.num ? `<span class="cpt-num" title="Viewers vote with !vote ${esc(p.num)}">#${esc(p.num)}</span>` : ''}
+            ${p.num ? `<span class="cpt-num" title="${esc(cptT('card.voteHint', { num: p.num }))}">#${esc(p.num)}</span>` : ''}
             <span>${esc(p.title)}</span>
           </h4>
           <div class="cpt-card-badges">
-            <span class="cpt-upvotes ${p.votes ? 'cpt-has-votes' : ''} ${bumpId === p.id ? 'cpt-vote-bump' : ''}" title="${esc(p.votes || 0)} upvotes · type !vote ${esc(p.num)} in chat">▲ ${esc(p.votes || 0)}</span>
+            <span class="cpt-upvotes ${p.votes ? 'cpt-has-votes' : ''} ${bumpId === p.id ? 'cpt-vote-bump' : ''}" title="${esc(cptT('card.upvotes', { n: p.votes || 0, num: p.num }))}">▲ ${esc(p.votes || 0)}</span>
             <span class="cpt-tag ${p.status === 'new' ? 'cpt-tag-new' : 'cpt-tag-reviewed'}">
-              ${p.status === 'new' ? 'NEW' : 'REVIEWED'}
+              ${esc(cptT(p.status === 'new' ? 'status.new' : 'status.reviewed'))}
             </span>
           </div>
         </div>
         <div class="cpt-card-tags">
           <span class="cpt-cat-badge">${cat.icon} ${esc(cat.label)}</span>
-          ${(p.tags || []).map(t => `<button class="cpt-mini-tag cpt-tag-${esc(t.toLowerCase().replace(/[^a-z0-9]/g, ''))} ${this.tagFilter === t ? 'cpt-active' : ''}" data-action="tag" data-tag="${esc(t)}" title="Filter by ${esc(t)}">[${esc(t)}]</button>`).join('')}
+          ${(p.tags || []).map(t => `<button class="cpt-mini-tag cpt-tag-${esc(t.toLowerCase().replace(/[^a-z0-9]/g, ''))} ${this.tagFilter === t ? 'cpt-active' : ''}" data-action="tag" data-tag="${esc(t)}" title="${esc(cptT('card.filterTag', { tag: t }))}">[${esc(t)}]</button>`).join('')}
         </div>
         <p class="cpt-card-desc">${esc(p.description)}</p>
         <div class="cpt-card-footer">
           <span class="cpt-card-author" style="color: ${this.safeColor(p.authorColor)}">@${esc(p.author)}${platform ? ` <span class="cpt-platform-badge cpt-platform-${esc(p.platform)}">${esc(platform)}</span>` : ''}</span>
           <div class="cpt-card-actions">
-            ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="cpt-card-link">🔗 Link</a>` : ''}
-            <button class="cpt-btn cpt-btn-xs cpt-btn-stream ${onAir ? 'cpt-active' : ''}" data-action="show" data-id="${esc(p.id)}" title="${onAir ? 'Hide the on-stream overlay' : 'Show this item as a lower-third overlay'}">
-              ${onAir ? '🔴 On Air' : '📺 Show on Stream'}
+            ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="cpt-card-link">${esc(cptT('card.link'))}</a>` : ''}
+            <button class="cpt-btn cpt-btn-xs cpt-btn-stream ${onAir ? 'cpt-active' : ''}" data-action="show" data-id="${esc(p.id)}" title="${esc(cptT(onAir ? 'card.hideTitle' : 'card.showTitle'))}">
+              ${esc(cptT(onAir ? 'card.onAir' : 'card.show'))}
             </button>
             <button class="cpt-btn cpt-btn-xs" data-action="toggle" data-id="${esc(p.id)}">
-              ${p.status === 'new' ? '✓ Mark Reviewed' : '↩ Mark New'}
+              ${esc(cptT(p.status === 'new' ? 'card.markReviewed' : 'card.markNew'))}
             </button>
-            <button class="cpt-btn cpt-btn-xs" style="color: #ef4444;" data-action="delete" data-id="${esc(p.id)}" title="Delete">✕</button>
+            <button class="cpt-btn cpt-btn-xs" style="color: #ef4444;" data-action="delete" data-id="${esc(p.id)}" title="${esc(cptT('card.delete'))}">✕</button>
           </div>
         </div>
       </div>

@@ -12,8 +12,10 @@
   <h1>analyzeMessage() tests</h1>
   <div id="summary"></div>
   <pre id="results"></pre>
+  <script src="../i18n.js"></script>
   <script src="../chat_project_tracker.js"></script>
   <script>
+    cptSetLanguage('en', { persist: false });
     const tracker = new ChatProjectTracker({ containerId: '__none__', persist: false });
 
     // [text, expectedDetected, expectedTags (optional, subset), expectedTitle (optional)]
