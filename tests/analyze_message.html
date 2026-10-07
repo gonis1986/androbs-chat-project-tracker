@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ChatProjectTracker - analyzeMessage() tests</title>
+  <style>
+    body { font-family: monospace; background: #0c0f17; color: #e5e7eb; padding: 20px; }
+    .pass { color: #34d399; } .fail { color: #ef4444; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>analyzeMessage() tests</h1>
+  <div id="summary"></div>
+  <pre id="results"></pre>
+  <script src="../chat_project_tracker.js"></script>
+  <script>
+    const tracker = new ChatProjectTracker({ containerId: '__none__', persist: false });
+
+    // [text, expectedDetected, expectedTags (optional, subset), expectedTitle (optional)]
+    const cases = [
+      // Commands
+      ['!project SuperAI - Autonomous agent for Discord moderation', true, ['Project'], 'SuperAI'],
+      ['!idea a bot that summarizes chat', true, ['Idea', 'App']],
+      ['!proyecto Gestor de tareas - para equipos remotos', true, [], 'Gestor de tareas'],
+      ['!progetto Meteo Live - widget meteo per OBS', true, [], 'Meteo Live'],
+      // Existing simulator messages
+      ['Hey streamer! Check out my open-source project: https://github.com/sofia/voice-transcriber-app', true, ['GitHub'], 'voice-transcriber-app'],
+      ['¡Hola! He creado una app para calcular estadísticas de la NBA: https://nbastats.vercel.app', true, ['Vercel', 'App'], 'nbastats'],
+      ["Un'idea per te: potresti fare un bot che riassume la chat ogni 10 minuti!", true, ['Idea', 'App']],
+      // English
+      ['I built a tool that turns tweets into slides', true, ['App']],
+      ["I've been working on a side project for tracking habits, would love your thoughts", true],
+      ['just launched my new website for indie devs', true],
+      ['what do you think of my portfolio?', true],
+      ['you should build a bot that clips the best moments', true, ['Idea', 'App']],
+      ['idea for the stream: a live coding challenge vs chat', true, ['Idea']],
+      ['here is my repo github.com/foo/bar-cli', true, ['GitHub'], 'bar-cli'],
+      ['my game is on itch https://cool-dino.itch.io', true, ['Web'], 'cool-dino'],
+      ['I made a game in Godot over the weekend', true],
+      // Spanish
+      ['mira este proyecto que hice', true],
+      ['hice una herramienta para convertir audios a texto', true, ['App']],
+      ['les comparto mi repo https://gitlab.com/ana/compilador', true, ['GitLab'], 'compilador'],
+      ['echale un vistazo a mi página web porfa', true],
+      ['estoy desarrollando una extensión para Chrome', true, ['App']],
+      ['acabo de lanzar mi primera aplicación!!', true, ['App']],
+      ['deberías hacer un bot para moderar el chat', true, ['Idea', 'App']],
+      ['tengo una idea: un juego donde el chat controla al streamer', true, ['Idea']],
+      ['qué opinas de mi proyecto?', true],
+      // Italian
+      ['guarda il mio progetto su GitHub', true],
+      ['ho sviluppato uno strumento per gestire i sottotitoli', true, ['App']],
+      ['vi condivido il mio sito https://marco.dev', true, ['Web']],
+      ["date un'occhiata al mio nuovo progetto", true],
+      ['sto lavorando a una libreria per Rust', true],
+      ['sarebbe bello un bot per i sondaggi', true, ['Idea', 'App']],
+      ['ho realizzato un videogioco in Unity', true],
+      // Negatives (chit-chat)
+      ['GG streamer! Great play, keep it up!', false],
+      ['check out that play omg', false],
+      ['look at this game, the boss is insane', false],
+      ['you should make a clip of that', false],
+      ['mira ese gol!!', false],
+      ['deberías hacer un directo mañana', false],
+      ['guarda che bella giocata', false],
+      ['il mio gioco preferito è Elden Ring', false],
+      ['can a mod check this user?', false],
+      ['https://www.youtube.com/watch?v=dQw4w9WgXcQ lol', false],
+      ['hola a todos desde Argentina', false],
+      ['ciao a tutti!', false]
+    ];
+
+    let pass = 0;
+    const lines = cases.map(([text, expected, tags = [], title]) => {
+      const res = tracker.analyzeMessage({ id: 't', author: 'tester', text });
+      const errors = [];
+      if (!!res !== expected) errors.push(`detected=${!!res}, expected ${expected}`);
+      if (res && expected) {
+        tags.forEach(t => { if (!res.tags.includes(t)) errors.push(`missing tag ${t} (got ${res.tags.join(',')})`); });
+        if (title && res.title !== title) errors.push(`title="${res.title}", expected "${title}"`);
+      }
+      if (!errors.length) pass++;
+      const detail = res ? ` -> [${res.tags.join(', ')}] "${res.title}"` : '';
+      return `${errors.length ? 'FAIL' : 'PASS'} ${JSON.stringify(text)}${detail}${errors.length ? '\n     ' + errors.join('; ') : ''}`;
+    });
+
+    // Markdown export
+    const md = tracker.toMarkdown([
+      { title: 'voice [beta]', url: 'https://github.com/sofia/voice_(app)', author: 'SofiaCode', description: 'Line one\nline two' },
+      { title: 'SuperAI', url: '', author: 'AlexDev', description: 'Autonomous agent' },
+      { title: 'nbastats', url: 'https://nbastats.vercel.app', author: 'Carlos_VE', description: 'He creado una app: https://nbastats.vercel.app' }
+    ]);
+    const expectedMd = '- [voice \\[beta\\]](https://github.com/sofia/voice_%28app%29) by @SofiaCode: Line one line two\n- **SuperAI** by @AlexDev: Autonomous agent\n- [nbastats](https://nbastats.vercel.app) by @Carlos_VE: He creado una app';
+    const mdOk = md === expectedMd;
+    if (mdOk) pass++;
+    lines.push(`${mdOk ? 'PASS' : 'FAIL'} toMarkdown()${mdOk ? '' : '\n     got: ' + JSON.stringify(md)}`);
+
+    const total = cases.length + 1;
+    document.getElementById('results').innerHTML = lines
+      .map(l => `<span class="${l.startsWith('PASS') ? 'pass' : 'fail'}">${l.replace(/</g, '&lt;')}</span>`).join('\n');
+    document.getElementById('summary').innerHTML =
+      `<b class="${pass === total ? 'pass' : 'fail'}" id="result-line">RESULT: ${pass}/${total} passed</b>`;
+  </script>
+</body>
+</html>
