@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ChatProjectTracker - connectors, upvotes & overlay tests</title>
+  <link rel="stylesheet" href="../chat_project_tracker.css">
+  <style>
+    body { font-family: monospace; background: #0c0f17; color: #e5e7eb; padding: 20px; }
+    .pass { color: #34d399; } .fail { color: #ef4444; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Connectors, upvotes &amp; overlay tests</h1>
+  <div id="summary">running...</div>
+  <pre id="results"></pre>
+  <script src="../chat_connectors.js"></script>
+  <script src="../chat_project_tracker.js"></script>
+  <script>
+    const lines = [];
+    let pass = 0, total = 0;
+    function check(name, actual, expected) {
+      total++;
+      const ok = JSON.stringify(actual) === JSON.stringify(expected);
+      if (ok) pass++;
+      lines.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : `\n     got ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)}`}`);
+    }
+    const pick = (o, keys) => o && Object.fromEntries(keys.map(k => [k, o[k]]));
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    (async () => {
+      // ---------- Twitch adapter ----------
+      const tw = TwitchAdapter.parseLine('@badge-info=;color=#FF7F50;display-name=Night\\sOwl;id=abc-123;tmi-sent-ts=1700000000000 :nightowl!nightowl@nightowl.tmi.twitch.tv PRIVMSG #androbs :I built a tool: https://x.vercel.app');
+      check('twitch: tags, escaped display-name, text', pick(tw, ['id', 'author', 'text', 'color', 'timestamp', 'platform', 'channel']),
+        { id: 'tw_abc-123', author: 'Night Owl', text: 'I built a tool: https://x.vercel.app', color: '#FF7F50', timestamp: 1700000000000, platform: 'twitch', channel: 'androbs' });
+      check('twitch: /me ACTION unwrapped', TwitchAdapter.parseLine(':bob!bob@bob.tmi.twitch.tv PRIVMSG #a :\u0001ACTION check out my repo\u0001').text, 'check out my repo');
+      check('twitch: no tags -> login as author', TwitchAdapter.parseLine(':bob!bob@bob.tmi.twitch.tv PRIVMSG #a :hi').author, 'bob');
+      check('twitch: PING ignored', TwitchAdapter.parseLine('PING :tmi.twitch.tv'), null);
+      check('twitch: JOIN ignored', TwitchAdapter.parseLine(':bob!bob@bob.tmi.twitch.tv JOIN #a'), null);
+
+      // ---------- Kick adapter ----------
+      const kickFrame = JSON.stringify({
+        event: 'App\\Events\\ChatMessageEvent', channel: 'chatrooms.668.v2',
+        data: JSON.stringify({ id: 'k-1', chatroom_id: 668, content: 'mira mi proyecto [emote:37226:KEKW] github.com/a/b', type: 'message',
+          created_at: '2026-10-07T10:00:00Z', sender: { id: 5, username: 'KickDev', slug: 'kickdev', identity: { color: '#53FC18', badges: [] } } })
+      });
+      check('kick: pusher frame string, emotes -> names', pick(KickAdapter.parse(kickFrame), ['id', 'author', 'text', 'color', 'timestamp', 'platform']),
+        { id: 'kick_k-1', author: 'KickDev', text: 'mira mi proyecto KEKW github.com/a/b', color: '#53FC18', timestamp: Date.parse('2026-10-07T10:00:00Z'), platform: 'kick' });
+      check('kick: inner message object accepted', KickAdapter.parse({ content: '!vote 2', sender: { username: 'z' } }).text, '!vote 2');
+      check('kick: non-chat events ignored', KickAdapter.parse({ event: 'App\\Events\\UserBannedEvent', data: '{}' }), null);
+      check('kick: pusher system frames ignored', KickAdapter.parse('{"event":"pusher:connection_established","data":"{}"}'), null);
+      check('kick: invalid JSON ignored', KickAdapter.parse('not json'), null);
+
+      // ---------- YouTube adapter ----------
+      const yt = YouTubeAdapter.parse({ id: 'LCC.1', snippet: { publishedAt: '2026-10-07T10:00:00Z', displayMessage: 'ho creato un sito' },
+        authorDetails: { displayName: '@Luca', isChatModerator: true } });
+      check('youtube: liveChatMessage, @ stripped, mod color', pick(yt, ['id', 'author', 'text', 'color', 'platform']),
+        { id: 'yt_LCC.1', author: 'Luca', text: 'ho creato un sito', color: '#60a5fa', platform: 'youtube' });
+      check('youtube: superchat comment fallback', YouTubeAdapter.parse({ snippet: { superChatDetails: { userComment: '+1' } }, authorDetails: { displayName: 'A' } }).text, '+1');
+      check('youtube: empty item ignored', YouTubeAdapter.parse({ snippet: { type: 'tombstone' } }), null);
+      check('youtube: video ids', [
+        'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3', 'https://youtu.be/dQw4w9WgXcQ', 'youtube.com/live/dQw4w9WgXcQ?si=x', 'dQw4w9WgXcQ', 'nope'
+      ].map(v => YouTubeAdapter.parseVideoId(v)), ['dQw4w9WgXcQ', 'dQw4w9WgXcQ', 'dQw4w9WgXcQ', 'dQw4w9WgXcQ', '']);
+      check('connector factory', ['twitch', 'kick', 'youtube'].map(p => createChatConnector(p, {}).constructor.name),
+        ['TwitchConnector', 'KickConnector', 'YouTubeConnector']);
+
+      // ---------- Vote parsing ----------
+      const t = new ChatProjectTracker({ containerId: '__none__', persist: false, overlayDuration: 300 });
+      check('parseVote', ['!vote 1', '!upvote #12', '!VOTO 3', '!vota 4 grande', '+1', '+1 great idea', '+ 1', '+10 points', '+1.5', '!vote', 'vote 1'].map(x => t.parseVote(x)),
+        [{ num: 1 }, { num: 12 }, { num: 3 }, { num: 4 }, { plusOne: true }, { plusOne: true }, { plusOne: true }, null, null, null, null]);
+
+      // ---------- Upvotes ----------
+      t.processMessage({ id: 'a', author: 'A', text: '!project Alpha - first', platform: 'twitch' });
+      t.processMessage(KickAdapter.parse(kickFrame));
+      t.processMessage(yt);
+      const byNum = n => t.projects.find(p => p.num === n);
+      check('projects numbered #1..#3', t.projects.map(p => p.num), [3, 2, 1]);
+      check('platform stored on projects', [1, 2, 3].map(n => byNum(n).platform), ['twitch', 'kick', 'youtube']);
+      check('!vote 1 counts', t.processMessage({ author: 'V1', text: '!vote 1', platform: 'twitch' }), true);
+      check('same viewer cannot vote twice', t.processMessage({ author: 'v1', text: '!upvote 1', platform: 'twitch' }), false);
+      check('same name on another platform is a different viewer', t.processMessage({ author: 'V1', text: '!upvote #1', platform: 'kick' }), true);
+      check('unknown id ignored', t.processMessage({ author: 'V2', text: '!vote 99' }), false);
+      check('vote commands never become projects', t.projects.length, 3);
+      t.processMessage({ author: 'V3', text: '+1', platform: 'youtube' });
+      check('+1 goes to the newest project when nothing is on stream', [1, 2, 3].map(n => byNum(n).votes), [2, 0, 1]);
+      check('voters recorded', byNum(1).voters, ['twitch:v1', 'kick:v1']);
+
+      // ---------- Sorting ----------
+      t.processMessage({ author: 'V4', text: '!vote 2' });
+      t.processMessage({ author: 'V5', text: '!vote 2' });
+      t.processMessage({ author: 'V6', text: '!vote 2' });
+      t.setSort('votes');
+      check('sort by most upvoted', t.getFilteredProjects().map(p => p.num), [2, 1, 3]);
+      t.setSort('newest');
+      check('sort by newest', t.getFilteredProjects().map(p => p.num), [3, 2, 1]);
+      t.deleteProject(byNum(3).id);
+      t.processMessage({ id: 'd', author: 'D', text: '!idea Delta bot' });
+      check('numbers are not reused after delete', t.projects[0].num, 4);
+
+      // ---------- Overlay ----------
+      t.processMessage({ id: 'x', author: 'Eve<script>', text: '!project <img src=x onerror=alert(1)> - check https://github.com/eve/xss' });
+      const xss = t.projects[0];
+      check('showOnStream returns true', t.showOnStream(xss.id), true);
+      const ov = document.querySelector('.cpt-overlay');
+      check('overlay rendered and sliding in', !!ov && ov.classList.contains('cpt-overlay-in'), true);
+      check('overlay escapes chat content', [ov.querySelector('.cpt-overlay-title').textContent, ov.querySelectorAll('img, script').length], ['<img src=x onerror=alert(1)>', 0]);
+      check('overlay link is clickable', ov.querySelector('.cpt-overlay-link').getAttribute('href'), 'https://github.com/eve/xss');
+      check('overlay shows author', ov.querySelector('.cpt-overlay-author').textContent.trim(), 'by @Eve<script>');
+      t.processMessage({ author: 'V7', text: '+1' });
+      t.processMessage({ author: 'V8', text: '+1' });
+      check('+1 goes to the on-stream project', xss.votes, 2);
+      check('overlay vote badge updates live', ov.querySelector('.cpt-overlay-votes').textContent, '▲ 2');
+      t.showOnStream(byNum(1).id);
+      check('showing another project replaces the overlay', [document.querySelectorAll('.cpt-overlay-in').length, t.onAirId], [1, byNum(1).id]);
+      await sleep(450);
+      check('overlay auto-hides after overlayDuration', [t.onAirId, document.querySelectorAll('.cpt-overlay-in').length], [null, 0]);
+      await sleep(800);
+      check('overlay element removed after fade-out', document.querySelectorAll('.cpt-overlay').length, 0);
+
+      // ---------- Persistence of votes ----------
+      const key = '__cpt_test_' + Date.now();
+      const p1 = new ChatProjectTracker({ containerId: '__none__', storageKey: key });
+      p1.processMessage({ id: 'p', author: 'P', text: '!project Persisted' });
+      p1.processMessage({ author: 'Q', text: '!vote 1' });
+      p1.setSort('votes');
+      const p2 = new ChatProjectTracker({ containerId: '__none__', storageKey: key });
+      check('votes, voters, number & sort survive reload', [p2.projects[0].votes, p2.projects[0].voters, p2.projects[0].num, p2.sortMode, p2.seq], [1, ['chat:q'], 1, 'votes', 1]);
+      localStorage.setItem(key, JSON.stringify([{ id: 'old1', author: 'o', title: 'Old', description: 'x', timestamp: 1 }, { id: 'old2', author: 'o', title: 'Old2', description: 'y', timestamp: 2 }]));
+      localStorage.removeItem(key + '_meta');
+      const p3 = new ChatProjectTracker({ containerId: '__none__', storageKey: key });
+      check('legacy saved projects get numbers oldest-first and 0 votes', p3.projects.map(p => [p.id, p.num, p.votes]), [['old1', 1, 0], ['old2', 2, 0]]);
+      localStorage.removeItem(key); localStorage.removeItem(key + '_meta');
+
+      document.getElementById('results').innerHTML = lines
+        .map(l => `<span class="${l.startsWith('PASS') ? 'pass' : 'fail'}">${l.replace(/</g, '&lt;')}</span>`).join('\n');
+      document.getElementById('summary').innerHTML =
+        `<b class="${pass === total ? 'pass' : 'fail'}" id="result-line">RESULT: ${pass}/${total} passed</b>`;
+    })().catch(e => { document.getElementById('summary').textContent = 'ERROR: ' + e.stack; });
+  </script>
+</body>
+</html>
