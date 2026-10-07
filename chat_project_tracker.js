@@ -4,6 +4,11 @@
  */
 
 const CPT_TAG_ORDER = ['GitHub', 'GitLab', 'Vercel', 'Netlify', 'Web', 'App', 'Idea', 'Project'];
+const CPT_PLATFORM_LABELS = { twitch: 'Twitch', kick: 'Kick', youtube: 'YouTube' };
+
+// "!vote 3", "!upvote #3", "!voto 3", "!vota 3"; "+1" votes for the project on stream (or the newest one).
+const CPT_VOTE_CMD_RE = /^\s*!(?:vote|upvote|voto|vota|votar|votare)\s+#?(\d+)(?!\w)/i;
+const CPT_PLUS_ONE_RE = /^\s*\+\s?1(?![\d.,])/;
 
 // Matching runs on accent-stripped, lowercased text, so patterns only need plain ASCII.
 const CPT_NOUNS = [
@@ -137,9 +142,15 @@ class ChatProjectTracker {
     this.storageKey = options.storageKey || 'androbs_chat_project_tracker_v1';
     this.persist = options.persist !== false;
     this.onProjectAdded = options.onProjectAdded || null;
+    this.onVote = options.onVote || null;
+    this.overlayDuration = Number(options.overlayDuration) > 0 ? Number(options.overlayDuration) : 8000;
     this.filterState = 'all'; // 'all', 'new', 'reviewed'
     this.tagFilter = null;
     this.searchQuery = '';
+    this.sortMode = 'newest'; // 'newest' | 'votes'
+    this.seq = 0;
+    this.onAirId = null;
+    this.bumpId = null;
     this.projects = this.loadProjects();
 
     this.initUI();
@@ -197,6 +208,9 @@ class ChatProjectTracker {
       description: description,
       url: url,
       status: 'new', // 'new' | 'reviewed'
+      platform: CPT_PLATFORM_LABELS[msg.platform] ? msg.platform : '',
+      votes: 0,
+      voters: [],
       timestamp: msg.timestamp || Date.now()
     };
     project.tags = this.detectTags(project, { kind, command, norm });
@@ -272,6 +286,8 @@ class ChatProjectTracker {
    * Main entry point to feed incoming chat messages into the tracker
    */
   processMessage(msg) {
+    if (msg && this.parseVote(msg.text)) return this.handleVote(msg);
+
     const project = this.analyzeMessage(msg);
     if (!project) return false;
 
@@ -282,6 +298,7 @@ class ChatProjectTracker {
       project.id += '_' + Math.random().toString(36).substr(2, 5);
     }
 
+    project.num = ++this.seq;
     this.projects.unshift(project);
     this.saveProjects();
     this.render();
@@ -290,6 +307,124 @@ class ChatProjectTracker {
       this.onProjectAdded(project);
     }
     return true;
+  }
+
+  // ---------- Community upvotes ----------
+
+  /** Returns { num } for "!vote N" / "!upvote N", { plusOne: true } for "+1", otherwise null. */
+  parseVote(text) {
+    const value = String(text || '');
+    const cmd = value.match(CPT_VOTE_CMD_RE);
+    if (cmd) return { num: parseInt(cmd[1], 10) };
+    return CPT_PLUS_ONE_RE.test(value) ? { plusOne: true } : null;
+  }
+
+  handleVote(msg) {
+    const vote = this.parseVote(msg.text);
+    if (!vote) return false;
+    let target;
+    if (vote.plusOne) {
+      target = this.projects.find(p => p.id === this.onAirId) ||
+        this.projects.reduce((best, p) => (!best || (p.num || 0) > (best.num || 0) ? p : best), null);
+    } else {
+      target = this.projects.find(p => p.num === vote.num);
+    }
+    if (!target) return false;
+    const voter = `${msg.platform || 'chat'}:${String(msg.author || 'viewer').toLowerCase()}`;
+    return this.upvote(target.id, voter);
+  }
+
+  /** Adds one vote per voter key; returns false for duplicates or unknown projects. */
+  upvote(projectId, voter) {
+    const item = this.projects.find(p => p.id === projectId);
+    if (!item) return false;
+    item.voters = item.voters || [];
+    if (voter && item.voters.includes(voter)) return false;
+    if (voter) item.voters.push(voter);
+    item.votes = (item.votes || 0) + 1;
+    this.bumpId = item.id;
+    this.saveProjects();
+    this.render();
+    if (this.onAirId === item.id) this.updateOverlayVotes(item);
+    if (typeof this.onVote === 'function') this.onVote(item, voter);
+    return true;
+  }
+
+  setSort(mode) {
+    this.sortMode = mode === 'votes' ? 'votes' : 'newest';
+    this.saveProjects();
+    this.render();
+  }
+
+  // ---------- Broadcast overlay ----------
+
+  showOnStream(projectId) {
+    if (typeof document === 'undefined') return false;
+    const p = this.projects.find(x => x.id === projectId);
+    if (!p) return false;
+    this.hideOverlay();
+
+    const esc = v => this.escapeHtml(v);
+    const url = this.safeUrl(p.url);
+    const desc = String(p.description || '').split(p.url || '\u0000').join(' ').replace(/\s+/g, ' ').replace(/[\s:,-]+$/, '').trim();
+    const linkLabel = url ? url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '') : '';
+    const platform = CPT_PLATFORM_LABELS[p.platform];
+
+    const el = document.createElement('div');
+    el.className = 'cpt-overlay';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.style.setProperty('--cpt-overlay-duration', `${this.overlayDuration}ms`);
+    el.innerHTML = `
+      <div class="cpt-overlay-accent"></div>
+      <div class="cpt-overlay-body">
+        <div class="cpt-overlay-eyebrow">
+          <span class="cpt-overlay-live"><span class="cpt-overlay-dot"></span>Community Project</span>
+          ${p.num ? `<span class="cpt-overlay-chip">#${esc(p.num)}</span>` : ''}
+          ${platform ? `<span class="cpt-overlay-chip cpt-platform-${esc(p.platform)}">${esc(platform)}</span>` : ''}
+          <span class="cpt-overlay-chip cpt-overlay-votes">▲ ${esc(p.votes || 0)}</span>
+        </div>
+        <div class="cpt-overlay-title">${esc(p.title)}</div>
+        <div class="cpt-overlay-author">by <span style="color: ${this.safeColor(p.authorColor)}">@${esc(p.author)}</span></div>
+        ${desc ? `<div class="cpt-overlay-desc">${esc(desc)}</div>` : ''}
+        ${url ? `<a class="cpt-overlay-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(linkLabel)}</a>` : ''}
+      </div>
+      <button class="cpt-overlay-close" type="button" aria-label="Hide overlay">✕</button>
+      <div class="cpt-overlay-progress"></div>
+    `;
+    el.querySelector('.cpt-overlay-close').addEventListener('click', () => this.hideOverlay());
+    document.body.appendChild(el);
+    void el.offsetWidth; // start the slide-in transition from the off-screen state
+    el.classList.add('cpt-overlay-in');
+
+    this.overlayEl = el;
+    this.onAirId = p.id;
+    this.overlayTimer = setTimeout(() => this.hideOverlay(), this.overlayDuration);
+    this.render();
+    return true;
+  }
+
+  hideOverlay() {
+    clearTimeout(this.overlayTimer);
+    const el = this.overlayEl;
+    this.overlayEl = null;
+    const wasOnAir = this.onAirId;
+    this.onAirId = null;
+    if (el) {
+      el.classList.remove('cpt-overlay-in');
+      el.classList.add('cpt-overlay-out');
+      setTimeout(() => el.remove(), 700);
+    }
+    if (wasOnAir) this.render();
+  }
+
+  updateOverlayVotes(item) {
+    const badge = this.overlayEl && this.overlayEl.querySelector('.cpt-overlay-votes');
+    if (!badge) return;
+    badge.textContent = `▲ ${item.votes || 0}`;
+    badge.classList.remove('cpt-vote-bump');
+    void badge.offsetWidth;
+    badge.classList.add('cpt-vote-bump');
   }
 
   toggleStatus(projectId) {
@@ -302,6 +437,7 @@ class ChatProjectTracker {
   }
 
   deleteProject(projectId) {
+    if (this.onAirId === projectId) this.hideOverlay();
     this.projects = this.projects.filter(p => p.id !== projectId);
     this.saveProjects();
     this.render();
@@ -312,7 +448,9 @@ class ChatProjectTracker {
     if (!skipConfirm && typeof window !== 'undefined' && typeof window.confirm === 'function') {
       if (!window.confirm(`Delete all ${this.projects.length} captured projects? This cannot be undone.`)) return false;
     }
+    this.hideOverlay();
     this.projects = [];
+    this.seq = 0;
     this.saveProjects();
     this.render();
     this.showToast('All projects cleared');
@@ -349,15 +487,23 @@ class ChatProjectTracker {
     const storage = this.getStorage();
     if (!storage) return [];
     try {
+      const meta = JSON.parse(storage.getItem(`${this.storageKey}_meta`) || '{}') || {};
+      if (meta.sortMode === 'votes') this.sortMode = 'votes';
       const parsed = JSON.parse(storage.getItem(this.storageKey) || '[]');
       if (!Array.isArray(parsed)) return [];
-      return parsed
+      const projects = parsed
         .filter(p => p && typeof p === 'object' && p.id)
         .map(p => ({
           ...p,
           status: p.status === 'reviewed' ? 'reviewed' : 'new',
-          tags: Array.isArray(p.tags) && p.tags.length ? p.tags : this.detectTags(p)
+          tags: Array.isArray(p.tags) && p.tags.length ? p.tags : this.detectTags(p),
+          votes: Math.max(0, parseInt(p.votes, 10) || 0),
+          voters: Array.isArray(p.voters) ? p.voters : []
         }));
+      // Never reuse a vote number, even after deletions; number legacy projects oldest-first.
+      this.seq = Math.max(parseInt(meta.seq, 10) || 0, ...projects.map(p => p.num || 0), 0);
+      projects.filter(p => !p.num).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0)).forEach(p => { p.num = ++this.seq; });
+      return projects;
     } catch (e) {
       console.warn('[ChatProjectTracker] Could not read saved projects:', e);
       return [];
@@ -369,6 +515,7 @@ class ChatProjectTracker {
     if (!storage) return;
     try {
       storage.setItem(this.storageKey, JSON.stringify(this.projects));
+      storage.setItem(`${this.storageKey}_meta`, JSON.stringify({ seq: this.seq, sortMode: this.sortMode }));
     } catch (e) {
       console.warn('[ChatProjectTracker] Could not save projects:', e);
     }
@@ -472,6 +619,8 @@ class ChatProjectTracker {
   getFilteredProjects() {
     const query = cptNormalize(this.searchQuery).trim();
     const terms = query ? query.split(/\s+/) : [];
+    const byNewest = (a, b) => (b.num || 0) - (a.num || 0) || (b.timestamp || 0) - (a.timestamp || 0);
+    const sorter = this.sortMode === 'votes' ? (a, b) => (b.votes || 0) - (a.votes || 0) || byNewest(a, b) : byNewest;
     return this.projects.filter(p => {
       if (this.filterState !== 'all' && p.status !== this.filterState) return false;
       if (this.tagFilter && !(p.tags || []).includes(this.tagFilter)) return false;
@@ -480,7 +629,7 @@ class ChatProjectTracker {
         return terms.every(t => haystack.includes(t));
       }
       return true;
-    });
+    }).sort(sorter);
   }
 
   initUI() {
@@ -501,9 +650,15 @@ class ChatProjectTracker {
             </div>
             <span class="cpt-badge-count" id="cpt-counter">0 Projects</span>
           </div>
-          <div class="cpt-search-wrap">
-            <span class="cpt-search-icon">🔍</span>
-            <input type="search" class="cpt-search" id="cpt-search" placeholder="Search title, author, keywords..." autocomplete="off" aria-label="Search projects">
+          <div class="cpt-search-row">
+            <div class="cpt-search-wrap">
+              <span class="cpt-search-icon">🔍</span>
+              <input type="search" class="cpt-search" id="cpt-search" placeholder="Search title, author, keywords..." autocomplete="off" aria-label="Search projects">
+            </div>
+            <div class="cpt-sort-toggle" role="group" aria-label="Sort projects">
+              <button class="cpt-sort-btn" data-action="sort" data-sort="newest" title="Sort by Newest">🕒 Newest</button>
+              <button class="cpt-sort-btn" data-action="sort" data-sort="votes" title="Sort by Most Upvoted">▲ Most Upvoted</button>
+            </div>
           </div>
           <div class="cpt-tag-filters" id="cpt-tag-filters" aria-label="Filter by tag"></div>
         </div>
@@ -531,13 +686,15 @@ class ChatProjectTracker {
     container.addEventListener('click', e => {
       const btn = e.target.closest('[data-action]');
       if (!btn || !container.contains(btn)) return;
-      const { action, id, filter, tag } = btn.dataset;
+      const { action, id, filter, tag, sort } = btn.dataset;
       switch (action) {
         case 'export-json': this.exportJSON(); break;
         case 'copy-md': this.copyMarkdown(); break;
         case 'clear-all': this.clearAll(); break;
         case 'filter': this.setFilter(filter); break;
         case 'tag': this.setTagFilter(tag); break;
+        case 'sort': this.setSort(sort); break;
+        case 'show': this.onAirId === id ? this.hideOverlay() : this.showOnStream(id); break;
         case 'toggle': this.toggleStatus(id); break;
         case 'delete': this.deleteProject(id); break;
       }
@@ -580,6 +737,11 @@ class ChatProjectTracker {
       container.querySelectorAll('.cpt-filter-btn').forEach(b => {
         b.classList.toggle('cpt-active', b.dataset.filter === this.filterState);
       });
+      container.querySelectorAll('.cpt-sort-btn').forEach(b => {
+        const active = b.dataset.sort === this.sortMode;
+        b.classList.toggle('cpt-active', active);
+        b.setAttribute('aria-pressed', String(active));
+      });
     }
 
     if (filtered.length === 0) {
@@ -599,30 +761,41 @@ class ChatProjectTracker {
     }
 
     const esc = v => this.escapeHtml(v);
+    const bumpId = this.bumpId;
+    this.bumpId = null;
     listEl.innerHTML = filtered.map(p => {
       const url = this.safeUrl(p.url);
+      const onAir = this.onAirId === p.id;
+      const platform = CPT_PLATFORM_LABELS[p.platform];
       return `
-      <div class="cpt-card" data-id="${esc(p.id)}">
+      <div class="cpt-card ${onAir ? 'cpt-on-air' : ''}" data-id="${esc(p.id)}">
         <div class="cpt-card-header">
           <h4 class="cpt-card-title">
+            ${p.num ? `<span class="cpt-num" title="Viewers vote with !vote ${esc(p.num)}">#${esc(p.num)}</span>` : ''}
             <span>${esc(p.title)}</span>
           </h4>
-          <span class="cpt-tag ${p.status === 'new' ? 'cpt-tag-new' : 'cpt-tag-reviewed'}">
-            ${p.status === 'new' ? 'NEW' : 'REVIEWED'}
-          </span>
+          <div class="cpt-card-badges">
+            <span class="cpt-upvotes ${p.votes ? 'cpt-has-votes' : ''} ${bumpId === p.id ? 'cpt-vote-bump' : ''}" title="${esc(p.votes || 0)} upvotes · type !vote ${esc(p.num)} in chat">▲ ${esc(p.votes || 0)}</span>
+            <span class="cpt-tag ${p.status === 'new' ? 'cpt-tag-new' : 'cpt-tag-reviewed'}">
+              ${p.status === 'new' ? 'NEW' : 'REVIEWED'}
+            </span>
+          </div>
         </div>
         <div class="cpt-card-tags">
           ${(p.tags || []).map(t => `<span class="cpt-mini-tag cpt-tag-${esc(t.toLowerCase())}">[${esc(t)}]</span>`).join('')}
         </div>
         <p class="cpt-card-desc">${esc(p.description)}</p>
         <div class="cpt-card-footer">
-          <span class="cpt-card-author" style="color: ${this.safeColor(p.authorColor)}">@${esc(p.author)}</span>
-          <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="cpt-card-author" style="color: ${this.safeColor(p.authorColor)}">@${esc(p.author)}${platform ? ` <span class="cpt-platform-badge cpt-platform-${esc(p.platform)}">${esc(platform)}</span>` : ''}</span>
+          <div class="cpt-card-actions">
             ${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="cpt-card-link">🔗 Link</a>` : ''}
-            <button class="cpt-btn" style="padding: 2px 6px; font-size: 10px;" data-action="toggle" data-id="${esc(p.id)}">
+            <button class="cpt-btn cpt-btn-xs cpt-btn-stream ${onAir ? 'cpt-active' : ''}" data-action="show" data-id="${esc(p.id)}" title="${onAir ? 'Hide the on-stream overlay' : 'Show this project as a lower-third overlay'}">
+              ${onAir ? '🔴 On Air' : '📺 Show on Stream'}
+            </button>
+            <button class="cpt-btn cpt-btn-xs" data-action="toggle" data-id="${esc(p.id)}">
               ${p.status === 'new' ? '✓ Mark Reviewed' : '↩ Mark New'}
             </button>
-            <button class="cpt-btn" style="padding: 2px 6px; font-size: 10px; color: #ef4444;" data-action="delete" data-id="${esc(p.id)}" title="Delete">✕</button>
+            <button class="cpt-btn cpt-btn-xs" style="color: #ef4444;" data-action="delete" data-id="${esc(p.id)}" title="Delete">✕</button>
           </div>
         </div>
       </div>

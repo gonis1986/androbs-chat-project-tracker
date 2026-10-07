@@ -121,7 +121,18 @@
       border-color: #7928ca;
     }
 
-    .twitch-connect-box {
+    .sim-section-label {
+      color: #9ca3af;
+      font-size: 13px;
+      margin: 4px 0 0 0;
+    }
+
+    .sim-btn span.badge-kick { background: rgba(83, 252, 24, 0.15); color: #53fc18; }
+    .sim-btn span.badge-youtube { background: rgba(255, 0, 51, 0.2); color: #fca5a5; }
+    .sim-btn span.badge-twitch { background: rgba(145, 70, 255, 0.25); color: #c4b5fd; }
+    .sim-btn span.badge-vote { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+
+    .connect-box {
       border-top: 1px solid rgba(255, 255, 255, 0.1);
       padding-top: 16px;
       display: flex;
@@ -129,10 +140,52 @@
       gap: 10px;
     }
 
-    .twitch-input-row {
+    .platform-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 3px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+    }
+
+    .platform-tab {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-radius: 7px;
+      color: #9ca3af;
+      padding: 7px 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .platform-tab:hover { color: #fff; }
+    .platform-tab[aria-selected="true"] { color: #fff; background: var(--tab-color); }
+    .platform-tab[data-platform="kick"][aria-selected="true"] { color: #0b0e14; }
+
+    .platform-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .platform-panel[hidden] { display: none; }
+
+    .platform-hint {
+      font-size: 11px;
+      color: #6b7280;
+      margin: 0;
+    }
+
+    .connect-row {
       display: flex;
       gap: 8px;
     }
+
+    .connect-row .sim-btn { justify-content: center; }
 
     .status-pill {
       font-size: 12px;
@@ -180,19 +233,71 @@
         </button>
       </div>
 
+      <p class="sim-section-label">Multi-platform payloads & community upvotes:</p>
+      <div class="sim-buttons">
+        <button class="sim-btn" onclick="simKickMessage()">
+          <span>🟢 <b>Kick</b> chat event (Spanish repo share)</span>
+          <span class="badge badge-kick">Kick adapter</span>
+        </button>
+
+        <button class="sim-btn" onclick="simYouTubeMessage()">
+          <span>🔴 <b>YouTube</b> liveChatMessage (Italian)</span>
+          <span class="badge badge-youtube">YouTube adapter</span>
+        </button>
+
+        <button class="sim-btn" onclick="simTwitchIrc()">
+          <span>🟣 <b>Twitch</b> raw IRC PRIVMSG</span>
+          <span class="badge badge-twitch">Twitch adapter</span>
+        </button>
+
+        <button class="sim-btn" onclick="simTwitchVote('!vote 1')">
+          <span>▲ <b>!vote 1</b> from a new Twitch viewer</span>
+          <span class="badge badge-vote">Upvote #1</span>
+        </button>
+
+        <button class="sim-btn" onclick="simKickVote('!upvote 2')">
+          <span>▲ <b>!upvote 2</b> from a new Kick viewer</span>
+          <span class="badge badge-vote">Upvote #2</span>
+        </button>
+
+        <button class="sim-btn" onclick="simYouTubeVote('+1')">
+          <span>▲ <b>+1</b> from a new YouTube viewer</span>
+          <span class="badge badge-vote">On-stream / newest</span>
+        </button>
+      </div>
+
       <div class="custom-msg-wrap">
         <input type="text" id="custom-text" class="custom-input" placeholder="Type a message to simulate (e.g. !project MyTool)..." onkeydown="if(event.key==='Enter') sendCustomMsg()">
         <button class="sim-btn" style="background: #7928ca; border: none; padding: 10px 18px;" onclick="sendCustomMsg()">Send</button>
       </div>
 
-      <!-- Real Twitch Channel Connect option -->
-      <div class="twitch-connect-box">
-        <h3 style="margin: 0; font-size: 14px;">Connect Real Twitch Channel:</h3>
-        <div class="twitch-input-row">
-          <input type="text" id="twitch-channel" class="custom-input" placeholder="Channel name (e.g. ibai, erismoh)...">
-          <button class="sim-btn" style="background: #9146ff; border: none;" onclick="connectTwitchChannel()">Connect</button>
+      <!-- Live chat connection: Twitch / Kick / YouTube -->
+      <div class="connect-box">
+        <h3 style="margin: 0; font-size: 14px;">Connect Live Chat:</h3>
+        <div class="platform-tabs" role="tablist" aria-label="Chat platform">
+          <button class="platform-tab" role="tab" data-platform="twitch" style="--tab-color: #9146ff;" aria-selected="true">Twitch</button>
+          <button class="platform-tab" role="tab" data-platform="kick" style="--tab-color: #53fc18;" aria-selected="false">Kick</button>
+          <button class="platform-tab" role="tab" data-platform="youtube" style="--tab-color: #ff0033;" aria-selected="false">YouTube</button>
         </div>
-        <div id="twitch-status" class="status-pill">Offline</div>
+
+        <div class="platform-panel" role="tabpanel" data-platform="twitch">
+          <input type="text" id="twitch-channel" class="custom-input" placeholder="Channel name (e.g. ibai, erismoh)...">
+        </div>
+        <div class="platform-panel" role="tabpanel" data-platform="kick" hidden>
+          <input type="text" id="kick-channel" class="custom-input" placeholder="Channel name or chatroom ID (e.g. xqc or 668)...">
+          <p class="platform-hint">If Kick blocks the channel lookup, enter the numeric chatroom ID instead.</p>
+        </div>
+        <div class="platform-panel" role="tabpanel" data-platform="youtube" hidden>
+          <input type="text" id="youtube-video" class="custom-input" placeholder="Live video URL or ID (e.g. youtube.com/watch?v=...)">
+          <input type="password" id="youtube-key" class="custom-input" placeholder="YouTube Data API v3 key" autocomplete="off">
+          <p class="platform-hint">The API key is only kept in memory for this tab and is never saved.</p>
+        </div>
+
+        <div class="connect-row">
+          <button class="sim-btn" id="connect-btn" style="flex: 1; background: #9146ff; border: none;" onclick="connectLiveChat()">Connect</button>
+          <button class="sim-btn" id="disconnect-btn" onclick="disconnectLiveChat()">Disconnect</button>
+        </div>
+        <div id="connect-status" class="status-pill">Offline</div>
       </div>
     </div>
 
@@ -200,6 +305,7 @@
     <div id="chat-project-tracker-root"></div>
   </div>
 
+  <script src="chat_connectors.js"></script>
   <script src="chat_project_tracker.js"></script>
   <script>
     // Initialize the Tracker
@@ -231,65 +337,126 @@
       input.value = '';
     }
 
-    // Real Twitch connection via WebSocket IRC
-    let socket = null;
+    // ---------- Multi-platform simulators (raw payloads go through the real adapters) ----------
+    const VIEWER_NAMES = ['PixelPablo', 'LunaLoops', 'ByteBard', 'GiuliaGG', 'NeoNacho', 'CodeKoala', 'MateoMod', 'RustyRaccoon'];
+    let simViewerSeq = 0;
+    function nextViewer() {
+      const name = VIEWER_NAMES[simViewerSeq % VIEWER_NAMES.length];
+      const round = Math.floor(simViewerSeq / VIEWER_NAMES.length);
+      simViewerSeq++;
+      return round ? `${name}${round + 1}` : name;
+    }
+
+    function kickFrame(username, color, content) {
+      // Shape of a kick.com Pusher frame on channel chatrooms.<id>.v2 (data is a JSON string).
+      return JSON.stringify({
+        event: 'App\\Events\\ChatMessageEvent',
+        channel: 'chatrooms.668.v2',
+        data: JSON.stringify({
+          id: crypto.randomUUID(),
+          chatroom_id: 668,
+          content,
+          type: 'message',
+          created_at: new Date().toISOString(),
+          sender: { id: 1000 + simViewerSeq, username, slug: username.toLowerCase(), identity: { color, badges: [] } }
+        })
+      });
+    }
+
+    function youTubeItem(displayName, text, extra = {}) {
+      // Shape of a YouTube Data API v3 liveChatMessage resource.
+      return {
+        kind: 'youtube#liveChatMessage',
+        id: 'LCC.' + Math.random().toString(36).slice(2, 14),
+        snippet: { type: 'textMessageEvent', publishedAt: new Date().toISOString(), hasDisplayContent: true, displayMessage: text, textMessageDetails: { messageText: text } },
+        authorDetails: { channelId: 'UC' + Math.random().toString(36).slice(2, 12), displayName, isChatOwner: false, isChatModerator: false, isChatSponsor: false, ...extra }
+      };
+    }
+
+    function feed(msg) {
+      if (msg) tracker.processMessage(msg);
+    }
+
+    function simKickMessage() {
+      feed(KickAdapter.parse(kickFrame('KickDev_AR', '#53FC18',
+        'Buenas! Les comparto mi repo [emote:37226:KEKW] https://github.com/kickdev/stream-overlay-kit para overlays en vivo')));
+    }
+
+    function simYouTubeMessage() {
+      feed(YouTubeAdapter.parse(youTubeItem('@LucaBuilds',
+        "Ho creato un'estensione per sottotitoli live in OBS: https://live-subs.netlify.app", { isChatSponsor: true })));
+    }
+
+    function simTwitchIrc() {
+      const line = `@badge-info=;badges=;color=#FF7F50;display-name=NightOwl_Dev;id=${crypto.randomUUID()};tmi-sent-ts=${Date.now()} ` +
+        ':nightowl_dev!nightowl_dev@nightowl_dev.tmi.twitch.tv PRIVMSG #androbs :I built a tool that turns VODs into blog posts https://vod2blog.vercel.app';
+      feed(TwitchAdapter.parseLine(line));
+    }
+
+    function simTwitchVote(text) {
+      const name = nextViewer();
+      feed(TwitchAdapter.parseLine(`@color=#A78BFA;display-name=${name};id=${crypto.randomUUID()} :${name.toLowerCase()}!${name.toLowerCase()}@x.tmi.twitch.tv PRIVMSG #androbs :${text}`));
+    }
+
+    function simKickVote(text) {
+      feed(KickAdapter.parse(kickFrame(nextViewer(), '#53FC18', text)));
+    }
+
+    function simYouTubeVote(text) {
+      feed(YouTubeAdapter.parse(youTubeItem('@' + nextViewer(), text)));
+    }
+
+    // ---------- Live chat connectors ----------
+    let activePlatform = 'twitch';
+    let connector = null;
+
+    function setStatus(state, text) {
+      const el = document.getElementById('connect-status');
+      el.textContent = text;
+      el.style.color = { connecting: '#fbbf24', connected: '#34d399', error: '#ef4444' }[state] || '#9ca3af';
+    }
+
+    document.querySelectorAll('.platform-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        activePlatform = tab.dataset.platform;
+        document.querySelectorAll('.platform-tab').forEach(t => t.setAttribute('aria-selected', String(t === tab)));
+        document.querySelectorAll('.platform-panel').forEach(p => { p.hidden = p.dataset.platform !== activePlatform; });
+        const btn = document.getElementById('connect-btn');
+        btn.style.background = CPT_PLATFORMS[activePlatform].color;
+        btn.style.color = activePlatform === 'kick' ? '#0b0e14' : '#fff';
+        btn.textContent = `Connect ${CPT_PLATFORMS[activePlatform].label}`;
+      });
+    });
+
+    function connectLiveChat() {
+      if (connector) connector.disconnect();
+      connector = createChatConnector(activePlatform, {
+        onMessage: msg => tracker.processMessage(msg),
+        onStatus: setStatus
+      });
+      if (activePlatform === 'kick') {
+        connector.connect({ channel: document.getElementById('kick-channel').value });
+      } else if (activePlatform === 'youtube') {
+        connector.connect({ video: document.getElementById('youtube-video').value, apiKey: document.getElementById('youtube-key').value });
+      } else {
+        connector.connect({ channel: document.getElementById('twitch-channel').value });
+      }
+    }
+
+    function disconnectLiveChat() {
+      if (connector) connector.disconnect();
+      connector = null;
+      setStatus('offline', 'Offline');
+    }
+
+    ['twitch-channel', 'kick-channel', 'youtube-video', 'youtube-key'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') connectLiveChat(); });
+    });
+
+    // Backwards-compatible alias for the previous Twitch-only button.
     function connectTwitchChannel() {
-      const input = document.getElementById('twitch-channel');
-      const statusEl = document.getElementById('twitch-status');
-      const channel = input.value.trim().toLowerCase();
-      if (!channel) return;
-
-      if (socket) socket.close();
-      statusEl.textContent = `Connecting to #${channel}...`;
-      statusEl.style.color = '#fbbf24';
-
-      socket = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
-      socket.onopen = () => {
-        socket.send('CAP REQ :twitch.tv/tags');
-        socket.send('PASS SCHMOOPIIE');
-        socket.send(`NICK justinfan${Math.floor(Math.random() * 80000)}`);
-        socket.send(`JOIN #${channel}`);
-        statusEl.textContent = `Connected to #${channel}`;
-        statusEl.style.color = '#34d399';
-      };
-
-      socket.onmessage = (event) => {
-        const lines = event.data.split('\r\n');
-        lines.forEach(line => {
-          if (line.startsWith('PING')) {
-            socket.send('PONG :tmi.twitch.tv');
-          } else if (line.includes('PRIVMSG')) {
-            // Simple parser
-            const parts = line.split(' ');
-            let tags = {};
-            if (parts[0].startsWith('@')) {
-              parts[0].substring(1).split(';').forEach(kv => {
-                const [k, v] = kv.split('=');
-                tags[k] = v;
-              });
-              parts.shift();
-            }
-            const author = tags['display-name'] || (parts[0].split('!')[0].substring(1));
-            const color = tags['color'] || '#60a5fa';
-            parts.shift(); // remove command
-            parts.shift(); // remove channel
-            const text = parts.join(' ').substring(1);
-            
-            tracker.processMessage({
-              id: tags['id'] || ('tw_' + Date.now()),
-              author: author,
-              text: text,
-              color: color,
-              timestamp: Date.now()
-            });
-          }
-        });
-      };
-
-      socket.onerror = () => {
-        statusEl.textContent = `Error connecting to #${channel}`;
-        statusEl.style.color = '#ef4444';
-      };
+      document.querySelector('.platform-tab[data-platform="twitch"]').click();
+      connectLiveChat();
     }
   </script>
 </body>
