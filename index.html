@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AndrOBS - Live Chat Project Tracker (Demo & Test Sandbox)</title>
+  <link rel="stylesheet" href="chat_project_tracker.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 30px;
+      background: radial-gradient(circle at top, #1a1e2e 0%, #0c0f17 100%);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .demo-header {
+      text-align: center;
+      margin-bottom: 30px;
+      max-width: 800px;
+    }
+
+    .demo-header h1 {
+      font-size: 28px;
+      margin: 0 0 10px 0;
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 50%, #7928ca 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .demo-header p {
+      color: #9ca3af;
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .layout-grid {
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      gap: 30px;
+      max-width: 1100px;
+      width: 100%;
+    }
+
+    .chat-sim-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-sizing: border-box;
+    }
+
+    .chat-sim-card h2 {
+      margin: 0;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sim-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .sim-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #e5e7eb;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sim-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: #00f2fe;
+      transform: translateX(4px);
+    }
+
+    .sim-btn span.badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .custom-msg-wrap {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .custom-input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    .custom-input:focus {
+      outline: none;
+      border-color: #7928ca;
+    }
+
+    .twitch-connect-box {
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .twitch-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .status-pill {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="demo-header">
+    <h1>AndrOBS - Live Chat Project Tracker</h1>
+    <p>Test sandbox for AI project extraction from stream chats (Twitch, Kick, YouTube)</p>
+  </div>
+
+  <div class="layout-grid">
+    <!-- Left column: Chat Simulation & Live Twitch connection -->
+    <div class="chat-sim-card">
+      <h2>🎮 Chat Simulator & Test Controls</h2>
+      <p style="color: #9ca3af; font-size: 13px; margin: 0;">Click to simulate viewers proposing ideas or testing edge cases:</p>
+
+      <div class="sim-buttons">
+        <button class="sim-btn" onclick="sendSimMsg('AlexDev', '!project SuperAI - Autonomous agent for Discord moderation', '#60a5fa')">
+          <span>💬 <b>!project</b> SuperAI - Autonomous agent</span>
+          <span class="badge">Triggers extractor</span>
+        </button>
+
+        <button class="sim-btn" onclick="sendSimMsg('SofiaCode', 'Hey streamer! Check out my open-source project: https://github.com/sofia/voice-transcriber-app', '#f472b6')">
+          <span>💬 Natural language + GitHub link</span>
+          <span class="badge">Triggers extractor</span>
+        </button>
+
+        <button class="sim-btn" onclick="sendSimMsg('Carlos_VE', '¡Hola! He creado una app para calcular estadísticas de la NBA: https://nbastats.vercel.app', '#34d399')">
+          <span>💬 Spanish language proposal</span>
+          <span class="badge">Triggers extractor</span>
+        </button>
+
+        <button class="sim-btn" onclick="sendSimMsg('MarcoIT', 'Un\'idea per te: potresti fare un bot che riassume la chat ogni 10 minuti!', '#fbbf24')">
+          <span>💬 Italian idea suggestion</span>
+          <span class="badge">Triggers extractor</span>
+        </button>
+
+        <button class="sim-btn" onclick="sendSimMsg('Gamer99', 'GG streamer! Great play, keep it up!', '#9ca3af')">
+          <span>💬 Normal chit-chat (Ignored)</span>
+          <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #ef4444;">No trigger</span>
+        </button>
+      </div>
+
+      <div class="custom-msg-wrap">
+        <input type="text" id="custom-text" class="custom-input" placeholder="Type a message to simulate (e.g. !project MyTool)..." onkeydown="if(event.key==='Enter') sendCustomMsg()">
+        <button class="sim-btn" style="background: #7928ca; border: none; padding: 10px 18px;" onclick="sendCustomMsg()">Send</button>
+      </div>
+
+      <!-- Real Twitch Channel Connect option -->
+      <div class="twitch-connect-box">
+        <h3 style="margin: 0; font-size: 14px;">Connect Real Twitch Channel:</h3>
+        <div class="twitch-input-row">
+          <input type="text" id="twitch-channel" class="custom-input" placeholder="Channel name (e.g. ibai, erismoh)...">
+          <button class="sim-btn" style="background: #9146ff; border: none;" onclick="connectTwitchChannel()">Connect</button>
+        </div>
+        <div id="twitch-status" class="status-pill">Offline</div>
+      </div>
+    </div>
+
+    <!-- Right column: The Widget Root -->
+    <div id="chat-project-tracker-root"></div>
+  </div>
+
+  <script src="chat_project_tracker.js"></script>
+  <script>
+    // Initialize the Tracker
+    const tracker = new ChatProjectTracker({
+      containerId: 'chat-project-tracker-root',
+      onProjectAdded: (p) => {
+        console.log('[Tracker] New Project captured:', p);
+      }
+    });
+    window.chatTracker = tracker;
+
+    // Simulation helper
+    function sendSimMsg(author, text, color) {
+      const msg = {
+        id: 'msg_' + Date.now(),
+        author: author,
+        text: text,
+        color: color || '#60a5fa',
+        timestamp: Date.now()
+      };
+      tracker.processMessage(msg);
+    }
+
+    function sendCustomMsg() {
+      const input = document.getElementById('custom-text');
+      const text = input.value.trim();
+      if (!text) return;
+      sendSimMsg('Viewer', text, '#a78bfa');
+      input.value = '';
+    }
+
+    // Real Twitch connection via WebSocket IRC
+    let socket = null;
+    function connectTwitchChannel() {
+      const input = document.getElementById('twitch-channel');
+      const statusEl = document.getElementById('twitch-status');
+      const channel = input.value.trim().toLowerCase();
+      if (!channel) return;
+
+      if (socket) socket.close();
+      statusEl.textContent = `Connecting to #${channel}...`;
+      statusEl.style.color = '#fbbf24';
+
+      socket = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+      socket.onopen = () => {
+        socket.send('CAP REQ :twitch.tv/tags');
+        socket.send('PASS SCHMOOPIIE');
+        socket.send(`NICK justinfan${Math.floor(Math.random() * 80000)}`);
+        socket.send(`JOIN #${channel}`);
+        statusEl.textContent = `Connected to #${channel}`;
+        statusEl.style.color = '#34d399';
+      };
+
+      socket.onmessage = (event) => {
+        const lines = event.data.split('\r\n');
+        lines.forEach(line => {
+          if (line.startsWith('PING')) {
+            socket.send('PONG :tmi.twitch.tv');
+          } else if (line.includes('PRIVMSG')) {
+            // Simple parser
+            const parts = line.split(' ');
+            let tags = {};
+            if (parts[0].startsWith('@')) {
+              parts[0].substring(1).split(';').forEach(kv => {
+                const [k, v] = kv.split('=');
+                tags[k] = v;
+              });
+              parts.shift();
+            }
+            const author = tags['display-name'] || (parts[0].split('!')[0].substring(1));
+            const color = tags['color'] || '#60a5fa';
+            parts.shift(); // remove command
+            parts.shift(); // remove channel
+            const text = parts.join(' ').substring(1);
+            
+            tracker.processMessage({
+              id: tags['id'] || ('tw_' + Date.now()),
+              author: author,
+              text: text,
+              color: color,
+              timestamp: Date.now()
+            });
+          }
+        });
+      };
+
+      socket.onerror = () => {
+        statusEl.textContent = `Error connecting to #${channel}`;
+        statusEl.style.color = '#ef4444';
+      };
+    }
+  </script>
+</body>
+</html>
