@@ -35,7 +35,7 @@
 
 ## 🌍 Languages
 
-The widget, the "Show on Stream" overlay and the demo page are available in **Italiano, Español, English and 日本語**. Pick one with the 🇮🇹/🇪🇸/🇬🇧/🇯🇵 selector in the widget header; the choice is saved in `localStorage` (`androbs_language`). The first time, the browser language is used (falls back to English). Pass `language: 'ja'` to `new ChatProjectTracker({...})` to force one, e.g. for an OBS Browser Source.
+The widget, the "Show on Stream" overlay and the demo page are available in **Italiano, Español, English, 日本語 and Українська**. Pick one with the 🇮🇹/🇪🇸/🇬🇧/🇯🇵/🇺🇦 selector in the widget header; the choice is saved in `localStorage` (`androbs_language`). The first time, the browser language is used (falls back to English). Pass `language: 'ja'` to `new ChatProjectTracker({...})` to force one, e.g. for an OBS Browser Source.
 
 Load `i18n.js` before the other scripts:
 
@@ -45,7 +45,7 @@ Load `i18n.js` before the other scripts:
 <script src="chat_project_tracker.js"></script>
 ```
 
-Translations live in `CPT_I18N` in `i18n.js`; to add a language, add an entry to `CPT_LANGUAGES` and a dictionary with the same keys as `en`. Chat detection itself still understands English, Spanish and Italian messages.
+Translations live in `CPT_I18N` in `i18n.js`; to add a language, add an entry to `CPT_LANGUAGES` and a dictionary with the same keys as `en`. Plurals use `.one` / `.other` keys; languages listed in `CPT_CLDR_PLURALS` (Ukrainian) also get `.few` / `.many`, picked with `Intl.PluralRules`. Chat detection itself still understands English, Spanish and Italian messages.
 
 ---
 
@@ -53,7 +53,7 @@ Translations live in `CPT_I18N` in `i18n.js`; to add a language, add an entry to
 
 ```text
 ├── index.html                  # Interactive test sandbox with simulators & Twitch / Kick / YouTube connectors
-├── i18n.js                     # UI translations (Italiano, Español, English, 日本語); load it first
+├── i18n.js                     # UI translations (Italiano, Español, English, 日本語, Українська); load it first
 ├── chat_connectors.js          # Platform adapters + live chat connectors
 ├── chat_project_tracker.js     # Core engine and extraction logic (ChatProjectTracker class)
 ├── chat_project_tracker.css    # Modern glassmorphism UI styles

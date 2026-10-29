@@ -1,5 +1,5 @@
 /**
- * i18n.js - androbs UI translations: Italiano, Español, English, 日本語.
+ * i18n.js - androbs UI translations: Italiano, Español, English, 日本語, Українська.
  * Load before chat_connectors.js and chat_project_tracker.js.
  * The chosen language is shared by the widget and the demo page and saved in localStorage.
  */
@@ -8,11 +8,14 @@ const CPT_LANGUAGES = {
   it: { label: 'Italiano', flag: '🇮🇹' },
   es: { label: 'Español', flag: '🇪🇸' },
   en: { label: 'English', flag: '🇬🇧' },
-  ja: { label: '日本語', flag: '🇯🇵' }
+  ja: { label: '日本語', flag: '🇯🇵' },
+  uk: { label: 'Українська', flag: '🇺🇦' }
 };
 const CPT_LANGUAGE_KEY = 'androbs_language';
 
 // Keys ending in .one / .other are plural forms picked by params.n; languages without plurals use the bare key.
+// Languages in CPT_CLDR_PLURALS also use .few / .many, picked with Intl.PluralRules (missing forms fall back to .other).
+const CPT_CLDR_PLURALS = ['uk'];
 const CPT_I18N = {
   en: {
     "app.title": "Live Showcase & Community Queue",
@@ -524,6 +527,143 @@ const CPT_I18N = {
     "connect.ytHint": "APIキーはこのタブのメモリ内にのみ保持され、保存されることはありません。",
     "connect.button": "{platform}に接続",
     "connect.disconnect": "切断"
+  },
+
+  uk: {
+    "app.title": "Live Showcase і черга спільноти",
+    "app.subtitle": "Ігри, технології, сайти, творчість і теми з чату",
+    "lang.label": "Мова",
+    "count.items.one": "{n} елемент",
+    "count.items.few": "{n} елементи",
+    "count.items.many": "{n} елементів",
+    "count.items.other": "{n} елемента",
+    "count.filtered.one": "{shown} / {n} елемент",
+    "count.filtered.few": "{shown} / {n} елементи",
+    "count.filtered.many": "{shown} / {n} елементів",
+    "count.filtered.other": "{shown} / {n} елемента",
+    "search.placeholder": "Пошук за назвою, автором, категорією...",
+    "search.aria": "Пошук елементів",
+    "sort.aria": "Сортування елементів",
+    "sort.newest": "🕒 Нові",
+    "sort.newestTitle": "Спочатку нові",
+    "sort.votes": "▲ Найпопулярніші",
+    "sort.votesTitle": "Спочатку з найбільшою кількістю голосів",
+    "cat.filterAria": "Фільтр за категорією",
+    "filter.all": "Усі",
+    "filter.new": "Нові",
+    "filter.reviewed": "Перевірені",
+    "status.new": "НОВЕ",
+    "status.reviewed": "ПЕРЕВІРЕНО",
+    "mode.label": "🎯 Режим трансляції",
+    "mode.all": "🌈 Усі категорії",
+    "mode.only": "Сьогодні лише {icon} {label}",
+    "mode.noteAll": "Приймаємо все",
+    "mode.skipped": "Пропущено поза темою: {n}",
+    "toast.modeOn": "Режим трансляції: сьогодні лише {icon} {label}",
+    "toast.modeAll": "Режим трансляції: приймаємо всі категорії",
+    "action.exportJson": "📥 Експорт JSON",
+    "action.copyMd": "📋 Копіювати Markdown",
+    "action.clearAll": "🗑 Очистити все",
+    "action.clearAllTitle": "Видалити всі зібрані елементи",
+    "confirm.clearAll": "Видалити всі зібрані елементи ({n})? Цю дію не можна скасувати.",
+    "toast.cleared": "Усі елементи видалено",
+    "toast.noReviewed": "Ще немає перевірених елементів для копіювання",
+    "toast.copied.one": "Скопійовано {n} перевірений елемент як Markdown",
+    "toast.copied.few": "Скопійовано {n} перевірені елементи як Markdown",
+    "toast.copied.many": "Скопійовано {n} перевірених елементів як Markdown",
+    "toast.copied.other": "Скопійовано {n} перевіреного елемента як Markdown",
+    "toast.clipboardError": "Не вдалося отримати доступ до буфера обміну",
+    "empty.none": "З чату ще нічого не зібрано.",
+    "empty.hint": "Глядачі можуть написати !game, !project, !site, !art або !idea чи просто поділитися посиланням на Steam, GitHub, Etsy або сайт.",
+    "empty.noMatch": "Немає елементів, що відповідають пошуку чи фільтрам.",
+    "card.voteHint": "Глядачі голосують командою !vote {num}",
+    "card.upvotes.one": "{n} голос · напишіть !vote {num} у чаті",
+    "card.upvotes.few": "{n} голоси · напишіть !vote {num} у чаті",
+    "card.upvotes.many": "{n} голосів · напишіть !vote {num} у чаті",
+    "card.upvotes.other": "{n} голосу · напишіть !vote {num} у чаті",
+    "card.filterTag": "Фільтр: {tag}",
+    "tag.clear": "Скинути фільтр за тегом",
+    "card.link": "🔗 Посилання",
+    "card.show": "📺 Показати в ефірі",
+    "card.onAir": "🔴 В ефірі",
+    "card.showTitle": "Показати цей елемент як титр унизу екрана",
+    "card.hideTitle": "Сховати титр з ефіру",
+    "card.markReviewed": "✓ Позначити перевіреним",
+    "card.markNew": "↩ Позначити новим",
+    "card.delete": "Видалити",
+    "overlay.by": "від {author}",
+    "overlay.hide": "Сховати титр",
+    "md.item": "{head} від @{author}",
+    "md.untitled": "Без назви",
+    "item.untitled": "Новий елемент",
+    "cat.gaming.label": "Ігри",
+    "cat.gaming.name": "Ігри",
+    "cat.gaming.overlay": "Пропозиція гри",
+    "cat.tech.label": "Технології",
+    "cat.tech.name": "Технології й код",
+    "cat.tech.overlay": "Технології й код",
+    "cat.web.label": "Сайти",
+    "cat.web.name": "Сайти й портали",
+    "cat.web.overlay": "Огляд сайту",
+    "cat.art.label": "Творчість",
+    "cat.art.name": "Рукоділля й мистецтво",
+    "cat.art.overlay": "Рукоділля й мистецтво",
+    "cat.idea.label": "Ідеї",
+    "cat.idea.name": "Ідеї й теми",
+    "cat.idea.overlay": "Тема трансляції",
+    "conn.offline": "Не під'єднано",
+    "conn.connecting": "Під'єднання до {target}...",
+    "conn.connected": "Під'єднано до {target}",
+    "conn.error": "Помилка під'єднання до {target}",
+    "conn.disconnected": "Від'єднано від {platform}",
+    "conn.twitchEnter": "Введіть назву каналу Twitch",
+    "conn.kickEnter": "Введіть назву каналу Kick або ID чату",
+    "conn.kickLookup": "Пошук kick.com/{name}...",
+    "conn.kickLookupFailed": "Не вдалося знайти \"{name}\" ({error}). Kick може блокувати пошук із браузера — введіть натомість числовий ID чату.",
+    "conn.kickError": "Помилка Kick: {error}",
+    "conn.ytEnterVideo": "Введіть URL або ID live-відео YouTube",
+    "conn.ytKeyRequired": "Потрібен ключ YouTube Data API v3",
+    "conn.ytFinding": "Пошук live-чату для відео {id}...",
+    "conn.ytConnected": "Під'єднано до live-чату YouTube ({id})",
+    "conn.ytError": "YouTube: {error}",
+    "conn.ytNoChat": "у цього відео немає активного live-чату",
+    "page.title": "androbs Universal Live Showcase і черга спільноти",
+    "page.docTitle": "androbs Universal Live Showcase і черга спільноти (демо й тестове середовище)",
+    "page.subtitle": "Ігри, технології, сайти, рукоділля та теми трансляції з чатів Twitch, Kick і YouTube: автоматично розподілені за категоріями, з голосуванням і показом в ефірі",
+    "sim.heading": "🎮 Симулятор чату й тестові елементи керування",
+    "sim.intro": "Натисніть, щоб змоделювати глядачів, які пропонують ідеї, або перевірити граничні випадки:",
+    "badge.triggers": "Запускає збір",
+    "badge.noTrigger": "Не запускає",
+    "sim.nl": "Звичайна мова + посилання GitHub",
+    "sim.spanish": "Пропозиція іспанською",
+    "sim.italianIdea": "Пропозиція ідеї італійською",
+    "sim.chitchat": "Звичайна розмова (ігнорується)",
+    "sim.catLabel": "Універсальні категорії (виберіть режим трансляції у віджеті, щоб перевірити фільтрацію):",
+    "sim.steam": "пропозиція гри (Twitch)",
+    "sim.etsy": "показ в'язаного виробу (Kick, іспанською)",
+    "sim.instagram": "акварельний портрет (YouTube, італійською)",
+    "sim.website": "Запит на огляд сайту (YouTube)",
+    "sim.topic": "Загальна тема трансляції (Twitch)",
+    "sim.multiLabel": "Повідомлення з різних платформ і голоси спільноти:",
+    "sim.kick": "подія чату (іспанською, ділиться репозиторієм)",
+    "sim.italian": "(італійською)",
+    "sim.twitchIrc": "сирий IRC PRIVMSG",
+    "sim.voteFrom": "від нового глядача {platform}",
+    "badge.adapter": "Адаптер {platform}",
+    "badge.upvote": "Голос за #{n}",
+    "badge.plusOne": "В ефірі / найновіший",
+    "custom.placeholder": "Введіть повідомлення для симуляції (напр. !project MyTool)...",
+    "custom.send": "Надіслати",
+    "connect.heading": "Під'єднати live-чат:",
+    "connect.platformAria": "Платформа чату",
+    "connect.twitchPh": "Назва каналу (напр. ibai, erismoh)...",
+    "connect.kickPh": "Назва каналу або ID чату (напр. xqc або 668)...",
+    "connect.kickHint": "Якщо Kick блокує пошук каналу, введіть натомість числовий ID чату.",
+    "connect.ytVideoPh": "URL або ID live-відео (напр. youtube.com/watch?v=...)",
+    "connect.ytKeyPh": "Ключ YouTube Data API v3",
+    "connect.ytHint": "Ключ API зберігається лише в пам'яті цієї вкладки й ніколи не записується.",
+    "connect.button": "Під'єднати {platform}",
+    "connect.disconnect": "Від'єднати"
   }
 };
 
@@ -561,11 +701,20 @@ function cptSetLanguage(lang, { persist = true } = {}) {
   return true;
 }
 
+function cptPluralCategory(n, lang) {
+  if (CPT_CLDR_PLURALS.includes(lang) && typeof Intl !== 'undefined' && Intl.PluralRules) {
+    try { return new Intl.PluralRules(lang).select(n); } catch (e) { /* fall back to one/other */ }
+  }
+  return n === 1 ? 'one' : 'other';
+}
+
 function cptT(key, params = {}, lang = cptCurrentLanguage) {
   const dict = CPT_I18N[lang] || CPT_I18N.en;
-  const plural = typeof params.n === 'number' ? `${key}.${params.n === 1 ? 'one' : 'other'}` : null;
-  const template = (plural && dict[plural]) || dict[key] ||
-    (plural && CPT_I18N.en[plural]) || CPT_I18N.en[key] || key;
+  const hasN = typeof params.n === 'number';
+  const enPlural = hasN ? `${key}.${params.n === 1 ? 'one' : 'other'}` : null;
+  const plural = hasN && CPT_I18N[lang] ? `${key}.${cptPluralCategory(params.n, lang)}` : enPlural;
+  const template = (plural && (dict[plural] || dict[`${key}.other`])) || dict[key] ||
+    (enPlural && CPT_I18N.en[enPlural]) || CPT_I18N.en[key] || key;
   return template.replace(/\{(\w+)\}/g, (m, name) => (name in params ? String(params[name]) : m));
 }
 
