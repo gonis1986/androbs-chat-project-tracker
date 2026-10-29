@@ -177,17 +177,20 @@
       // ---------- i18n ----------
       const langs = Object.keys(CPT_LANGUAGES);
       const enKeys = Object.keys(CPT_I18N.en);
-      const baseKey = k => k.replace(/\.(one|other)$/, '');
+      const baseKey = k => k.replace(/\.(one|few|many|other)$/, '');
       const placeholders = v => (v.match(/\{\w+\}/g) || []).sort().join(',');
-      check('languages offered', langs, ['it', 'es', 'en', 'ja']);
+      check('languages offered', langs, ['it', 'es', 'en', 'ja', 'uk']);
       check('every language has every key', langs.map(l => [l, enKeys.filter(k => !(k in CPT_I18N[l]) && !(baseKey(k) in CPT_I18N[l]))]), langs.map(l => [l, []]));
-      check('no keys missing from English', langs.map(l => [l, Object.keys(CPT_I18N[l]).filter(k => !(k in CPT_I18N.en) && !enKeys.some(e => baseKey(e) === k))]), langs.map(l => [l, []]));
+      check('no keys missing from English', langs.map(l => [l, Object.keys(CPT_I18N[l]).filter(k => !(k in CPT_I18N.en) && !enKeys.some(e => baseKey(e) === baseKey(k)))]), langs.map(l => [l, []]));
       check('placeholders match English', langs.map(l => [l, Object.keys(CPT_I18N[l]).filter(k => {
-        const en = CPT_I18N.en[k] || CPT_I18N.en[`${k}.other`];
+        const en = CPT_I18N.en[k] || CPT_I18N.en[`${baseKey(k)}.other`] || CPT_I18N.en[`${k}.other`];
         return placeholders(CPT_I18N[l][k]) !== placeholders(en);
       })]), langs.map(l => [l, []]));
       check('plurals, params and fallbacks', [cptT('count.items', { n: 1 }), cptT('count.items', { n: 3 }), cptT('count.items', { n: 3 }, 'ja'), cptT('count.items', { n: 1 }, 'it'), cptT('no.such.key')],
         ['1 Item', '3 Items', '3 件', '1 elemento', 'no.such.key']);
+      check('Ukrainian plural forms (one/few/many)', [1, 2, 5, 11, 21, 22, 25].map(n => cptT('count.items', { n }, 'uk')),
+        ['1 елемент', '2 елементи', '5 елементів', '11 елементів', '21 елемент', '22 елементи', '25 елементів']);
+      check('Ukrainian has few/many wherever English has .one/.other', enKeys.filter(k => k.endsWith('.other')).map(baseKey).filter(b => !(`${b}.few` in CPT_I18N.uk) || !(`${b}.many` in CPT_I18N.uk)), []);
 
       const i18nRoot = document.createElement('div');
       i18nRoot.id = '__i18n_root';
